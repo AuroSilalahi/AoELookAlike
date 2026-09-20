@@ -4,37 +4,37 @@ A medieval browser-based Real-Time Strategy (RTS) game built with Vanilla JavaSc
 
 ---
 
-## 🌟 What's New in this Expansion
+## 🌟 What's New in this Major Update
 
-### 🌸 4 Asian Kingdoms (Civilizations)
-Choose your kingdom on match launch, each with distinct historical traits and aesthetics:
-- **🌸 Japanese Shogunate**: *Bushido Discipline* (+15% Swordsman & Knight attack damage, faster strike rate).
-- **🏯 Korean Joseon**: *Divine Artillery* (Fortress fires +2 extra arrows, Towers & Fortress have +25% range).
-- **🐉 Chinese Dynasty**: *Imperial Dynasty* (+3 starting villagers, -20% building wood cost, rapid research).
-- **🐘 Indian Maurya**: *Armored Cavalry* (+30% Knight cavalry HP, farms and gold mines provide bonus yield).
+### 🏛️ Standalone Match Lobby & Landing Page
+- When opening the game, a dedicated full-screen **Main Menu & Match Setup Lobby** appears before any match begins.
+- No nation is assumed by default—choose your sovereign kingdom, configure participating opponents, map type, and AI difficulty before clicking **⚔️ COMMENCE BATTLE**.
+- Return to the Lobby at any time in-game via the top bar or pause menu.
+
+### 🤝 Diplomatic Alliances & Opponent Selection
+- Choose your sovereign kingdom from **🌸 Japanese**, **🏯 Korean**, **🐉 Chinese**, or **🐘 Indian** empires.
+- For each remaining kingdom, choose whether they participate and their diplomatic stance:
+  - ⚔️ **Enemy Rival**: Hostile kingdom that raids you and your allies.
+  - 🤝 **Allied Kingdom**: Friendly co-belligerent that trains armies, assists in combat, shares vision/Fog of War, and benefits from your Fortress healing aura.
+- Live configuration badge dynamically reflects your scenario: **⚔️ 1 vs 3 Total War**, **🤝 2 vs 2 Grand Alliance**, **⚔️ 1 vs 1 Historic Duel**, etc.
+
+### 🗺️ Dynamic Realm Sizing (50×50 to 80×80)
+- The map is no longer stuck at a single size! Realm dimensions scale dynamically based on participating kingdoms:
+  - **2 Kingdoms (1v1)**: **50×50 Compact Skirmish** (2,400 × 2,400 px) for tight, fast-paced tactical battles.
+  - **3 Kingdoms (1v2 / 2v1)**: **65×65 Expanded Realm** (3,120 × 3,120 px) with expansive frontier resources.
+  - **4 Kingdoms (1v3 / 2v2)**: **80×80 Colossal Empire** (3,840 × 3,840 px) for colossal multi-front warfare.
+
+### 🎲 Non-Linear Procedural Landscapes & Randomized Spawns
+- **Randomized Base Spawns**: Starting base quadrants are shuffled every match—you will no longer spawn in the same corner!
+- **Procedural River Valley**: Winding sinusoidal river with randomized flow direction, amplitude, and phase, linked by **5-tile wide stone bridges**.
+- **Procedural Mountain Pass**: Randomized rocky crags, ravine chasms, and wide paved mountain passes.
+- **Procedural Desert Oasis**: Scattered palm oases with water lakes and stone causeways across dynamic dunes.
+- **Dynamic Resource Groves**: Base starter groves, gold veins, and foraging bushes generated around each Town Center, plus procedural frontier deposits.
 
 ### 🏰 Fortress Bastion & Healing Sanctuary
-- **Multi-Arrow Volleys**: Town Center Fortresses automatically fire **volleys of arrows** (base: 3 arrows simultaneously) at multiple hostiles in range.
-- **Sanctuary Healing**: Any wounded soldier stationed around your Fortress is healed over time (+8 HP/sec) by consuming a small amount of Food (1 Food per 8 HP) from your stockpile.
-- **Blacksmith Ballistics**: Upgradeable arrow counts (*Arrow Slits* adds +2 arrows; *Ballistics* increases range & projectile velocity).
-
-### 🗺️ 3 Expansive 80x80 Maps (3840 x 3840 px)
-- **🌊 River Valley**: Divided by a winding central river with **4-tile wide stone bridges** and shallows that prevent army congestion.
-- **⛰️ Mountain Pass**: Rugged stone plateaus, choke points, defensible heights, and rich mountain gold seams.
-- **🏜️ Desert Oasis**: Vast golden dunes with fertile palm oases, wide flanking terrain, and multi-front warfare.
-
-### ⚔️ Multi-Enemy Grand Wars (Up to 4 Rival Kingdoms)
-- Play in **1 vs 1, 1 vs 2, 1 vs 3, or 1 vs 4 Grand Wars**!
-- Rival Kingdoms (Crimson Horde, Amethyst Empire, Solar Khanate, Verdant Sultanate) each build bases, towers, and mobilize coordinated raids across stone bridges.
-
-### 🌾 Abundant & Regrowing Resources
-- 20+ dense forest groves (220 wood/tree) with slow sapling regrowth.
-- Deep gold mines (650 gold) and berry foraging bushes across the realm.
-- Renewable crop fields (**Farms**) with 400 food reserves.
-
-### 🖥️ Viewable & Spacious UI
-- Deep, unclipped command and research panel (225px HUD) with distinct icons, clear unit names, and clean cost badges (`100🪵 20🪙`).
-- Match setup modal for selecting Kingdom, Map, Enemy Count, and Difficulty.
+- **Multi-Arrow Volleys**: Town Center Fortresses automatically fire simultaneous arrows (base: 3, upgradeable to 5 or 7 with Blacksmith research or Korean bonuses).
+- **Sanctuary Healing**: Injured friendly or allied soldiers stationed near the Fortress heal over time (+8 HP/sec) while consuming 1 Food per 8 HP from your stockpile.
+- **Blacksmith Tech**: Research *Arrow Slits* (+2 fortress arrows, +1 tower arrow) and *Bodkin Arrows* (+range & damage).
 
 ---
 

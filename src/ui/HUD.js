@@ -3,10 +3,10 @@ import { Unit } from '../entities/Unit.js';
 import { ENEMY_FACTIONS } from '../ai/EnemyAI.js';
 
 export const KINGDOMS = {
-  JAPANESE: { name: 'Japanese Shogunate', icon: '🌸' },
-  KOREAN: { name: 'Korean Joseon', icon: '🏯' },
-  CHINESE: { name: 'Chinese Empire', icon: '🐉' },
-  INDIAN: { name: 'Indian Maurya', icon: '🐘' }
+  JAPANESE: { id: 'JAPANESE', name: 'Japanese Shogunate', icon: '🌸', crest: '🌸', color: '#dc2626', trait: 'Bushido Discipline', desc: '+15% Swordsman & Knight attack damage, faster strike rate.' },
+  KOREAN: { id: 'KOREAN', name: 'Korean Joseon', icon: '🏯', crest: '🏯', color: '#2563eb', trait: 'Divine Artillery', desc: 'Fortress fires +2 extra arrows. Towers & Fortress have +25% range.' },
+  CHINESE: { id: 'CHINESE', name: 'Chinese Empire', icon: '🐉', crest: '🐉', color: '#ea580c', trait: 'Imperial Dynasty', desc: '+3 Starting Villagers, -20% building wood cost, faster research.' },
+  INDIAN: { id: 'INDIAN', name: 'Indian Maurya', icon: '🐘', crest: '🐘', color: '#16a34a', trait: 'Armored Cavalry', desc: '+30% Knight cavalry HP, farms provide +30% more food reserve.' }
 };
 
 export class HUD {
@@ -27,7 +27,7 @@ export class HUD {
     this.btnIdleVil = document.getElementById('btn-idle-vil');
     this.valIdleCount = document.getElementById('val-idle-count');
     this.btnMenuToggle = document.getElementById('btn-menu-toggle');
-    this.btnNewMatch = document.getElementById('btn-new-match');
+    this.btnReturnLobby = document.getElementById('btn-return-lobby');
 
     // Quest Tracker
     this.questText = document.getElementById('quest-text');
@@ -45,6 +45,7 @@ export class HUD {
     this.unitName = document.getElementById('unit-name');
     this.unitHpFill = document.getElementById('unit-hp-fill');
     this.unitHpText = document.getElementById('unit-hp-text');
+    this.unitStatsGrid = document.getElementById('unit-stats-grid');
     this.statAtk = document.getElementById('stat-atk');
     this.statSpd = document.getElementById('stat-spd');
     this.statState = document.getElementById('stat-state');
@@ -56,34 +57,31 @@ export class HUD {
     this.minimapCanvas = document.getElementById('minimap-canvas');
     this.minimapCtx = this.minimapCanvas.getContext('2d');
 
-    // Modals
-    this.btnHelp = document.getElementById('btn-controls-help');
-    this.btnCloseModal = document.getElementById('btn-close-modal');
-    this.btnModalStart = document.getElementById('btn-modal-start');
-    this.controlsModal = document.getElementById('controls-modal');
+    // Standalone Main Menu & Match Setup Page
+    this.mainMenuPage = document.getElementById('main-menu-page');
+    this.mainCivGrid = document.getElementById('main-civ-grid');
+    this.diplomacyGrid = document.getElementById('diplomacy-grid');
+    this.diplomacyBadge = document.getElementById('diplomacy-badge');
+    this.mainMapGrid = document.getElementById('main-map-grid');
+    this.mapScaleBadge = document.getElementById('map-scale-badge');
+    this.mainDifficulty = document.getElementById('main-difficulty');
+    this.mainMatchSummary = document.getElementById('main-match-summary');
+    this.btnCommenceBattle = document.getElementById('btn-commence-battle');
 
     // Pause / Settings Modal
     this.pauseModal = document.getElementById('pause-modal');
     this.btnClosePause = document.getElementById('btn-close-pause');
     this.btnResumeGame = document.getElementById('btn-resume-game');
     this.btnRestartGame = document.getElementById('btn-restart-game');
+    this.btnPauseLobby = document.getElementById('btn-pause-lobby');
     this.selectDifficulty = document.getElementById('select-difficulty');
     this.btnToggleFog = document.getElementById('btn-toggle-fog');
     this.btnSettingsMusic = document.getElementById('btn-settings-music');
     this.btnSettingsSound = document.getElementById('btn-settings-sound');
 
-    // Setup Modal
-    this.setupModal = document.getElementById('setup-modal');
-    this.btnCloseSetup = document.getElementById('btn-close-setup');
-    this.btnStartCustomMatch = document.getElementById('btn-start-custom-match');
-    this.selectEnemyCount = document.getElementById('select-enemy-count');
-    this.setupDifficulty = document.getElementById('setup-difficulty');
-    this.setupSummaryText = document.getElementById('setup-summary-text');
-    this.selectedCiv = 'JAPANESE';
-    this.selectedMap = 'RIVER_VALLEY';
-
     // Game Over Modal
     this.gameOverModal = document.getElementById('game-over-modal');
+    this.gameOverCard = document.getElementById('game-over-card');
     this.gameOverTitle = document.getElementById('game-over-title');
     this.gameOverSubtitle = document.getElementById('game-over-subtitle');
     this.statTime = document.getElementById('stat-time');
@@ -92,40 +90,53 @@ export class HUD {
     this.btnPlayAgain = document.getElementById('btn-play-again');
     this.btnGameOverSetup = document.getElementById('btn-game-over-setup');
 
+    // Modals
+    this.controlsModal = document.getElementById('controls-modal');
+    this.btnHelp = document.getElementById('btn-controls-help');
+    this.btnCloseModal = document.getElementById('btn-close-modal');
+    this.btnModalStart = document.getElementById('btn-modal-start');
+
+    // Lobby State
+    this.selectedCiv = 'JAPANESE';
+    this.selectedMap = 'RIVER_VALLEY';
+    this.opponentStates = {
+      KOREAN: { enabled: true, stance: 'ENEMY' },
+      CHINESE: { enabled: true, stance: 'ENEMY' },
+      INDIAN: { enabled: true, stance: 'ENEMY' }
+    };
+
     // Visual FX
     this.pings = [];
     this.floatingTexts = [];
     this.sparkles = [];
     this.minimapPings = [];
+    this.particles = [];
 
     this.currentContextEntity = null;
     this.isPaused = false;
+    this.lastSelectionKey = '';
 
-    this.setupEvents();
+    this.setupEventListeners();
+    this.initLobby();
   }
 
-  setupEvents() {
-    // Sound toggle
+  setupEventListeners() {
+    // Sound & Music Toggles
     if (this.btnSoundToggle) {
       this.btnSoundToggle.addEventListener('click', () => {
-        if (this.game.sound) {
-          const isMuted = this.game.sound.toggleMute();
-          const text = isMuted ? '🔇 Muted' : '🔊 Sound';
-          this.btnSoundToggle.textContent = text;
-          if (this.btnSettingsSound) this.btnSettingsSound.textContent = isMuted ? '🔇 Muted' : '🔊 On';
-        }
+        if (!this.game.sound) return;
+        const enabled = this.game.sound.toggleSound();
+        this.btnSoundToggle.textContent = enabled ? '🔊 Sound' : '🔇 Sound';
+        if (this.btnSettingsSound) this.btnSettingsSound.textContent = enabled ? '🔊 On' : '🔇 Off';
       });
     }
 
-    // Music toggle
     if (this.btnMusicToggle) {
       this.btnMusicToggle.addEventListener('click', () => {
-        if (this.game.sound) {
-          const enabled = this.game.sound.toggleMusic();
-          const text = enabled ? '🎵 Music' : '🎵 Off';
-          this.btnMusicToggle.textContent = text;
-          if (this.btnSettingsMusic) this.btnSettingsMusic.textContent = enabled ? '🎵 Playing' : '🎵 Off';
-        }
+        if (!this.game.sound) return;
+        const enabled = this.game.sound.toggleMusic();
+        this.btnMusicToggle.textContent = enabled ? '🎵 Music' : '🔇 Music';
+        if (this.btnSettingsMusic) this.btnSettingsMusic.textContent = enabled ? '🎵 Playing' : '🔇 Muted';
       });
     }
 
@@ -150,57 +161,36 @@ export class HUD {
     if (this.btnClosePause) this.btnClosePause.addEventListener('click', togglePause);
     if (this.btnResumeGame) this.btnResumeGame.addEventListener('click', togglePause);
 
+    // Restart Current Match
     if (this.btnRestartGame) {
       this.btnRestartGame.addEventListener('click', () => {
         this.pauseModal.classList.add('hidden');
         this.isPaused = false;
-        this.game.startNewMatch(this.selectedCiv, this.selectedMap, parseInt(this.selectEnemyCount.value, 10), this.selectDifficulty.value);
+        this.launchBattle();
       });
     }
 
-    // Match Setup Modal Listeners
-    const openSetupModal = () => {
-      this.setupModal.classList.remove('hidden');
+    if (this.btnPlayAgain) {
+      this.btnPlayAgain.addEventListener('click', () => {
+        this.gameOverModal.classList.add('hidden');
+        this.launchBattle();
+      });
+    }
+
+    // Return to Lobby / Main Menu Buttons
+    const openMainMenu = () => {
+      if (this.pauseModal) this.pauseModal.classList.add('hidden');
       if (this.gameOverModal) this.gameOverModal.classList.add('hidden');
+      if (this.controlsModal) this.controlsModal.classList.add('hidden');
+      this.isPaused = true;
+      if (this.mainMenuPage) {
+        this.mainMenuPage.classList.remove('hidden');
+      }
     };
-    if (this.btnNewMatch) this.btnNewMatch.addEventListener('click', openSetupModal);
-    if (this.btnGameOverSetup) this.btnGameOverSetup.addEventListener('click', openSetupModal);
-    if (this.btnCloseSetup) this.btnCloseSetup.addEventListener('click', () => this.setupModal.classList.add('hidden'));
 
-    // Civ Card click selection
-    const civCards = document.querySelectorAll('.civ-card');
-    civCards.forEach(card => {
-      card.addEventListener('click', () => {
-        civCards.forEach(c => c.classList.remove('active'));
-        card.classList.add('active');
-        this.selectedCiv = card.dataset.civ;
-        this.updateSetupSummary();
-      });
-    });
-
-    // Map Card click selection
-    const mapCards = document.querySelectorAll('.map-card');
-    mapCards.forEach(card => {
-      card.addEventListener('click', () => {
-        mapCards.forEach(c => c.classList.remove('active'));
-        card.classList.add('active');
-        this.selectedMap = card.dataset.map;
-        this.updateSetupSummary();
-      });
-    });
-
-    if (this.selectEnemyCount) {
-      this.selectEnemyCount.addEventListener('change', () => this.updateSetupSummary());
-    }
-
-    if (this.btnStartCustomMatch) {
-      this.btnStartCustomMatch.addEventListener('click', () => {
-        this.setupModal.classList.add('hidden');
-        const enemies = parseInt(this.selectEnemyCount.value, 10);
-        const diff = this.setupDifficulty.value;
-        this.game.startNewMatch(this.selectedCiv, this.selectedMap, enemies, diff);
-      });
-    }
+    if (this.btnReturnLobby) this.btnReturnLobby.addEventListener('click', openMainMenu);
+    if (this.btnPauseLobby) this.btnPauseLobby.addEventListener('click', openMainMenu);
+    if (this.btnGameOverSetup) this.btnGameOverSetup.addEventListener('click', openMainMenu);
 
     // Settings adjustments
     if (this.selectDifficulty) {
@@ -221,19 +211,15 @@ export class HUD {
     }
 
     // Help Modal
-    this.btnHelp.addEventListener('click', () => {
-      this.controlsModal.classList.remove('hidden');
-    });
+    if (this.btnHelp) {
+      this.btnHelp.addEventListener('click', () => {
+        this.controlsModal.classList.remove('hidden');
+      });
+    }
 
     const closeModal = () => this.controlsModal.classList.add('hidden');
-    this.btnCloseModal.addEventListener('click', closeModal);
-    this.btnModalStart.addEventListener('click', closeModal);
-
-    // Play Again button
-    this.btnPlayAgain.addEventListener('click', () => {
-      this.gameOverModal.classList.add('hidden');
-      this.game.startNewMatch(this.selectedCiv, this.selectedMap, parseInt(this.selectEnemyCount.value, 10), this.selectDifficulty.value);
-    });
+    if (this.btnCloseModal) this.btnCloseModal.addEventListener('click', closeModal);
+    if (this.btnModalStart) this.btnModalStart.addEventListener('click', closeModal);
 
     // Minimap navigation
     const handleMinimapInteraction = (e) => {
@@ -266,12 +252,217 @@ export class HUD {
     });
   }
 
-  updateSetupSummary() {
-    if (!this.setupSummaryText) return;
-    const civ = KINGDOMS[this.selectedCiv] || { name: 'Japanese' };
+  initLobby() {
+    // 1. Kingdom Card Selection in Main Menu
+    const civCards = document.querySelectorAll('#main-civ-grid .civ-card');
+    civCards.forEach(card => {
+      card.addEventListener('click', () => {
+        civCards.forEach(c => c.classList.remove('active'));
+        card.classList.add('active');
+        this.selectedCiv = card.dataset.civ;
+        this.refreshOpponentsGrid();
+        this.updateLobbySummary();
+      });
+    });
+
+    // 2. Map Card Selection in Main Menu
+    const mapCards = document.querySelectorAll('#main-map-grid .map-card');
+    mapCards.forEach(card => {
+      card.addEventListener('click', () => {
+        mapCards.forEach(c => c.classList.remove('active'));
+        card.classList.add('active');
+        this.selectedMap = card.dataset.map;
+        this.updateLobbySummary();
+      });
+    });
+
+    // 3. Difficulty Change
+    if (this.mainDifficulty) {
+      this.mainDifficulty.addEventListener('change', () => this.updateLobbySummary());
+    }
+
+    // 4. Commence Battle Button
+    if (this.btnCommenceBattle) {
+      this.btnCommenceBattle.addEventListener('click', () => {
+        this.launchBattle();
+      });
+    }
+
+    // Initialize opponents and summary
+    this.refreshOpponentsGrid();
+    this.updateLobbySummary();
+  }
+
+  refreshOpponentsGrid() {
+    if (!this.diplomacyGrid) return;
+    this.diplomacyGrid.innerHTML = '';
+
+    const allCivKeys = Object.keys(KINGDOMS);
+    const opponentCivs = allCivKeys.filter(k => k !== this.selectedCiv);
+
+    // Initialize opponent states if missing
+    for (const civKey of opponentCivs) {
+      if (!this.opponentStates[civKey]) {
+        this.opponentStates[civKey] = { enabled: true, stance: 'ENEMY' };
+      }
+    }
+
+    for (const civKey of opponentCivs) {
+      const info = KINGDOMS[civKey];
+      const state = this.opponentStates[civKey];
+
+      const card = document.createElement('div');
+      card.className = `diplomacy-card ${state.enabled ? 'active-opponent' : 'disabled-opponent'}`;
+      card.dataset.civ = civKey;
+
+      card.innerHTML = `
+        <div class="diplomacy-card-header">
+          <div class="opponent-info">
+            <span class="opponent-crest">${info.crest}</span>
+            <span class="opponent-name">${info.name}</span>
+          </div>
+          <label class="opponent-toggle" title="Include or exclude this kingdom">
+            <input type="checkbox" class="chk-opponent-enable" ${state.enabled ? 'checked' : ''}>
+            <span>In Battle</span>
+          </label>
+        </div>
+        <div class="stance-selector" style="${state.enabled ? '' : 'pointer-events: none; opacity: 0.35;'}">
+          <button type="button" class="btn-stance stance-enemy ${state.stance === 'ENEMY' ? 'active' : ''}" data-stance="ENEMY">
+            ⚔️ Enemy Rival
+          </button>
+          <button type="button" class="btn-stance stance-ally ${state.stance === 'ALLY' ? 'active' : ''}" data-stance="ALLY">
+            🤝 Allied Kingdom
+          </button>
+        </div>
+      `;
+
+      // Checkbox event
+      const chk = card.querySelector('.chk-opponent-enable');
+      chk.addEventListener('change', (e) => {
+        // Enforce at least 1 opponent enabled
+        const otherEnabled = opponentCivs.filter(k => k !== civKey && this.opponentStates[k].enabled);
+        if (!e.target.checked && otherEnabled.length === 0) {
+          e.target.checked = true;
+          this.showAlert('⚠️ At least one opponent kingdom must participate in the battle!');
+          return;
+        }
+
+        state.enabled = e.target.checked;
+        card.className = `diplomacy-card ${state.enabled ? 'active-opponent' : 'disabled-opponent'}`;
+        const sel = card.querySelector('.stance-selector');
+        sel.style.pointerEvents = state.enabled ? 'auto' : 'none';
+        sel.style.opacity = state.enabled ? '1' : '0.35';
+        this.updateLobbySummary();
+      });
+
+      // Stance buttons event
+      const btnEnemy = card.querySelector('.stance-enemy');
+      const btnAlly = card.querySelector('.stance-ally');
+
+      btnEnemy.addEventListener('click', () => {
+        state.stance = 'ENEMY';
+        btnEnemy.classList.add('active');
+        btnAlly.classList.remove('active');
+        this.updateLobbySummary();
+      });
+
+      btnAlly.addEventListener('click', () => {
+        state.stance = 'ALLY';
+        btnAlly.classList.add('active');
+        btnEnemy.classList.remove('active');
+        this.updateLobbySummary();
+      });
+
+      this.diplomacyGrid.appendChild(card);
+    }
+  }
+
+  updateLobbySummary() {
+    const allCivKeys = Object.keys(KINGDOMS);
+    const opponentCivs = allCivKeys.filter(k => k !== this.selectedCiv);
+
+    const activeOpponents = opponentCivs.filter(k => this.opponentStates[k]?.enabled);
+    const allies = activeOpponents.filter(k => this.opponentStates[k]?.stance === 'ALLY');
+    const enemies = activeOpponents.filter(k => this.opponentStates[k]?.stance === 'ENEMY');
+
+    const totalNations = 1 + activeOpponents.length;
+
+    // 1. Diplomacy Badge text
+    let badgeText = '⚔️ 1 vs 3 Total War';
+    let isAllied = allies.length > 0;
+
+    if (allies.length === 0) {
+      if (enemies.length === 1) badgeText = '⚔️ 1 vs 1 Historic Duel';
+      else if (enemies.length === 2) badgeText = '⚔️ 1 vs 2 Asymmetrical War';
+      else badgeText = '⚔️ 1 vs 3 Total War';
+    } else if (allies.length === 1) {
+      if (enemies.length === 1) badgeText = '🤝 2 vs 1 Decisive Strike';
+      else if (enemies.length === 2) badgeText = '🤝 2 vs 2 Grand Alliance';
+      else badgeText = '🤝 Allied Coalition';
+    } else {
+      badgeText = '🤝 Allied Coalition';
+    }
+
+    if (this.diplomacyBadge) {
+      this.diplomacyBadge.textContent = badgeText;
+      if (isAllied) {
+        this.diplomacyBadge.classList.add('allied');
+      } else {
+        this.diplomacyBadge.classList.remove('allied');
+      }
+    }
+
+    // 2. Map Scaling Badge text
+    let scaleText = '80×80 (4 Kingdoms)';
+    if (totalNations === 2) {
+      scaleText = '50×50 Compact Skirmish (2 Kingdoms)';
+    } else if (totalNations === 3) {
+      scaleText = '65×65 Expanded Realm (3 Kingdoms)';
+    } else {
+      scaleText = '80×80 Colossal Empire (4 Kingdoms)';
+    }
+
+    if (this.mapScaleBadge) {
+      this.mapScaleBadge.textContent = `🗺️ Dynamic Realm: ${scaleText}`;
+    }
+
+    // 3. Match Configuration preview string
+    const civName = KINGDOMS[this.selectedCiv]?.name || 'Japanese';
     const mapName = this.selectedMap.replace('_', ' ');
-    const count = this.selectEnemyCount ? this.selectEnemyCount.value : '4';
-    this.setupSummaryText.textContent = `${civ.name} • ${mapName} • ${count} Enemies`;
+    if (this.mainMatchSummary) {
+      this.mainMatchSummary.textContent = `${civName} • ${badgeText} • ${mapName} (${scaleText.split(' ')[0]})`;
+    }
+  }
+
+  launchBattle() {
+    if (this.mainMenuPage) {
+      this.mainMenuPage.classList.add('hidden');
+    }
+    this.isPaused = false;
+
+    // Resume Web Audio on user gesture
+    if (this.game.sound) {
+      this.game.sound.initAudio();
+    }
+
+    const allCivKeys = Object.keys(KINGDOMS);
+    const opponentCivs = allCivKeys.filter(k => k !== this.selectedCiv);
+
+    const activeOpponents = opponentCivs
+      .filter(k => this.opponentStates[k]?.enabled)
+      .map(k => ({
+        civId: k,
+        stance: this.opponentStates[k].stance
+      }));
+
+    const difficulty = this.mainDifficulty ? this.mainDifficulty.value : 'NORMAL';
+
+    this.game.startNewMatch({
+      playerCiv: this.selectedCiv,
+      mapType: this.selectedMap,
+      opponents: activeOpponents,
+      difficulty: difficulty
+    });
   }
 
   setCivilizationBanner(civId) {
@@ -769,10 +960,8 @@ export class HUD {
       const bY = (b.y / map.height) * h;
 
       if (b.faction === 'PLAYER') ctx.fillStyle = '#3b82f6';
-      else if (b.faction === 'ENEMY_1') ctx.fillStyle = '#ef4444';
-      else if (b.faction === 'ENEMY_2') ctx.fillStyle = '#a855f7';
-      else if (b.faction === 'ENEMY_3') ctx.fillStyle = '#f97316';
-      else ctx.fillStyle = '#14b8a6';
+      else if (b.isAlly) ctx.fillStyle = '#06b6d4';
+      else ctx.fillStyle = b.customColor || '#ef4444';
 
       const sz = b.buildingType === 'TOWN_CENTER' ? 8 : 5;
       ctx.fillRect(bX - sz / 2, bY - sz / 2, sz, sz);
@@ -788,10 +977,8 @@ export class HUD {
       const unitNormY = unit.y / map.height;
 
       if (unit.faction === 'PLAYER') ctx.fillStyle = '#67e8f9';
-      else if (unit.faction === 'ENEMY_1') ctx.fillStyle = '#f87171';
-      else if (unit.faction === 'ENEMY_2') ctx.fillStyle = '#c084fc';
-      else if (unit.faction === 'ENEMY_3') ctx.fillStyle = '#fb923c';
-      else ctx.fillStyle = '#2dd4bf';
+      else if (unit.isAlly) ctx.fillStyle = '#22d3ee';
+      else ctx.fillStyle = unit.customColor || '#f87171';
 
       ctx.beginPath();
       ctx.arc(unitNormX * w, unitNormY * h, 2.5, 0, Math.PI * 2);

@@ -10,11 +10,8 @@ export const ENEMY_FACTIONS = [
 export class EnemyAI {
   constructor(game) {
     this.game = game;
-
     this.difficulty = 'NORMAL'; // 'EASY' | 'NORMAL' | 'HARD'
-    this.activeEnemyCount = 1;
-
-    // Track state per active enemy faction
+    this.activeFactions = [];
     this.factionStates = {};
   }
 
@@ -23,15 +20,14 @@ export class EnemyAI {
     console.log(`⚔️ AI Difficulty set to: ${level}`);
   }
 
-  initFactions(count = 1) {
-    this.activeEnemyCount = Math.max(1, Math.min(4, count));
+  initFactions(factionsList = []) {
+    this.activeFactions = factionsList;
     this.factionStates = {};
 
-    for (let i = 0; i < this.activeEnemyCount; i++) {
-      const faction = ENEMY_FACTIONS[i].id;
-      // Stagger raid times so raids are dynamic and thrilling
-      const stagger = i * 15.0;
-      this.factionStates[faction] = {
+    for (let i = 0; i < this.activeFactions.length; i++) {
+      const f = this.activeFactions[i];
+      const stagger = i * 14.0;
+      this.factionStates[f.id] = {
         trainTimer: i * 3.0,
         raidTimer: -stagger,
         raidCount: 0,
@@ -46,26 +42,26 @@ export class EnemyAI {
     switch (this.difficulty) {
       case 'EASY':
         return {
-          firstRaid: 85.0,
-          raidInterval: 65.0,
-          trainInterval: 22.0,
+          firstRaid: 80.0,
+          raidInterval: 60.0,
+          trainInterval: 20.0,
           composition: ['SWORDSMAN', 'ARCHER'],
           buildTower: false
         };
       case 'HARD':
         return {
-          firstRaid: 45.0,
-          raidInterval: 32.0,
-          trainInterval: 11.0,
+          firstRaid: 40.0,
+          raidInterval: 30.0,
+          trainInterval: 10.0,
           composition: ['SWORDSMAN', 'ARCHER', 'KNIGHT', 'KNIGHT'],
           buildTower: true
         };
       case 'NORMAL':
       default:
         return {
-          firstRaid: 65.0,
-          raidInterval: 45.0,
-          trainInterval: 16.0,
+          firstRaid: 60.0,
+          raidInterval: 42.0,
+          trainInterval: 15.0,
           composition: ['SWORDSMAN', 'SWORDSMAN', 'ARCHER', 'KNIGHT'],
           buildTower: true
         };
@@ -75,29 +71,28 @@ export class EnemyAI {
   update(dt) {
     const config = this.getDifficultyConfig();
 
-    for (let i = 0; i < this.activeEnemyCount; i++) {
-      const factionInfo = ENEMY_FACTIONS[i];
+    for (const factionInfo of this.activeFactions) {
       const factionId = factionInfo.id;
       const state = this.factionStates[factionId];
       if (!state) continue;
 
-      // Check if this enemy's headquarters is still standing
-      const enemyTC = this.game.buildings.find(
+      // Check if this faction's Town Center is still standing
+      const tc = this.game.buildings.find(
         b => b.faction === factionId && b.buildingType === 'TOWN_CENTER' && !b.isDead
       );
-      if (!enemyTC) continue; // Conquered!
+      if (!tc) continue; // Conquered!
 
-      const enemyBarracks = this.game.buildings.find(
+      const barracks = this.game.buildings.find(
         b => b.faction === factionId && b.buildingType === 'BARRACKS' && !b.isDead
       );
 
       // 1. Train Reinforcements
       state.trainTimer += dt;
-      if (state.trainTimer >= config.trainInterval && enemyBarracks && enemyBarracks.queue.length === 0) {
+      if (state.trainTimer >= config.trainInterval && barracks && barracks.queue.length === 0) {
         state.trainTimer = 0;
         const choices = config.composition;
         const unitToTrain = choices[Math.floor(Math.random() * choices.length)];
-        enemyBarracks.queue.push({
+        barracks.queue.push({
           type: 'UNIT',
           id: unitToTrain,
           duration: 7,
@@ -108,25 +103,27 @@ export class EnemyAI {
       // 2. Base Defense Tower construction
       if (config.buildTower && !state.hasBuiltTower) {
         state.towerTimer += dt;
-        if (state.towerTimer >= 30.0 + i * 10) {
+        if (state.towerTimer >= 28.0) {
           state.hasBuiltTower = true;
-          const towerX = enemyTC.x + (enemyTC.x > 2000 ? -80 : 80);
-          const towerY = enemyTC.y + (enemyTC.y > 2000 ? -80 : 80);
-          const tower = new Building(towerX, towerY, 'WATCH_TOWER', factionId, true);
+          const offsetX = (tc.x > this.game.map.width * 0.5) ? -90 : 90;
+          const offsetY = (tc.y > this.game.map.height * 0.5) ? -90 : 90;
+          const tower = new Building(tc.x + offsetX, tc.y + offsetY, 'WATCH_TOWER', factionId, true);
+          tower.customColor = factionInfo.color;
+          tower.isAlly = (factionInfo.diplomacy === 'ALLY');
           this.game.buildings.push(tower);
         }
       }
 
-      // 3. Mobilize Raids
+      // 3. Mobilize Strikes & Raids
       state.raidTimer += dt;
       const threshold = state.raidCount === 0 ? config.firstRaid : config.raidInterval;
 
-      // Warning alert 6 seconds before raid
-      if (state.raidTimer >= threshold - 6 && !state.hasAlertedRaid) {
+      // Warning alert 5 seconds before hostile raid
+      if (factionInfo.diplomacy === 'ENEMY' && state.raidTimer >= threshold - 5 && !state.hasAlertedRaid) {
         state.hasAlertedRaid = true;
         this.game.hud.showAlert(`⚠️ INCOMING RAID: ${factionInfo.name} scouts spotted marching across the bridges!`);
         if (this.game.sound) this.game.sound.playAlarm();
-        this.game.hud.addMinimapPing(enemyTC.x, enemyTC.y, factionInfo.color);
+        this.game.hud.addMinimapPing(tc.x, tc.y, factionInfo.color);
       }
 
       if (state.raidTimer >= threshold) {
@@ -143,41 +140,57 @@ export class EnemyAI {
   }
 
   launchRaid(factionId, factionInfo) {
-    const playerTC = this.game.buildings.find(
-      b => b.faction === 'PLAYER' && b.buildingType === 'TOWN_CENTER' && !b.isDead
-    );
-    if (!playerTC) return;
-
     // Gather idle military troops of this faction
     const warriors = this.game.units.filter(
       u => u.faction === factionId && !u.isDead && !u.isDying
     );
+    if (warriors.length === 0) return;
 
-    if (warriors.length > 0) {
+    // Determine target based on diplomacy
+    if (factionInfo.diplomacy === 'ALLY') {
+      // Allied kingdom attacks an Enemy stronghold!
+      const enemyTCs = this.game.buildings.filter(
+        b => this.game.isHostile({ faction: factionId }, b) && b.buildingType === 'TOWN_CENTER' && !b.isDead
+      );
+      if (enemyTCs.length === 0) return;
+
+      const targetTC = enemyTCs[Math.floor(Math.random() * enemyTCs.length)];
+      this.game.hud.showAlert(`🤝 Your ally, the ${factionInfo.name}, has mobilized ${warriors.length} warriors to assault the enemy!`);
+      this.game.hud.addMinimapPing(warriors[0].x, warriors[0].y, factionInfo.color);
+
+      for (const warrior of warriors) {
+        warrior.orderAttack(targetTC);
+      }
+    } else {
+      // Enemy kingdom targets Player or Allied bases
+      const hostileTCs = this.game.buildings.filter(
+        b => this.game.isHostile({ faction: factionId }, b) && b.buildingType === 'TOWN_CENTER' && !b.isDead
+      );
+      if (hostileTCs.length === 0) return;
+
+      const primaryTC = hostileTCs[Math.floor(Math.random() * hostileTCs.length)];
+
       this.game.hud.showAlert(`⚔️ ${factionInfo.name} has launched a war party of ${warriors.length} troops!`);
       if (this.game.sound) this.game.sound.playAlarm();
       this.game.hud.addMinimapPing(warriors[0].x, warriors[0].y, factionInfo.color);
 
-      // Target selection: player towers, gather lines, or town center
-      const playerTowers = this.game.buildings.filter(
-        b => b.faction === 'PLAYER' && b.buildingType === 'WATCH_TOWER' && !b.isDead
+      // Pick targets: villagers, towers, or town center
+      const hostileVillagers = this.game.units.filter(
+        u => this.game.isHostile({ faction: factionId }, u) && u.unitType === 'VILLAGER' && !u.isDead
       );
-      const playerVillagers = this.game.units.filter(
-        u => u.faction === 'PLAYER' && u.unitType === 'VILLAGER' && !u.isDead
+      const hostileTowers = this.game.buildings.filter(
+        b => this.game.isHostile({ faction: factionId }, b) && b.buildingType === 'WATCH_TOWER' && !b.isDead
       );
 
-      warriors.forEach((warrior) => {
-        let primaryTarget = playerTC;
-
-        // Knights target vulnerable workers
-        if (warrior.unitType === 'KNIGHT' && playerVillagers.length > 0 && Math.random() > 0.4) {
-          primaryTarget = playerVillagers[Math.floor(Math.random() * playerVillagers.length)];
-        } else if (playerTowers.length > 0 && Math.random() > 0.5) {
-          primaryTarget = playerTowers[0];
+      for (const warrior of warriors) {
+        let chosenTarget = primaryTC;
+        if (warrior.unitType === 'KNIGHT' && hostileVillagers.length > 0 && Math.random() > 0.4) {
+          chosenTarget = hostileVillagers[Math.floor(Math.random() * hostileVillagers.length)];
+        } else if (hostileTowers.length > 0 && Math.random() > 0.5) {
+          chosenTarget = hostileTowers[0];
         }
-
-        warrior.orderAttack(primaryTarget);
-      });
+        warrior.orderAttack(chosenTarget);
+      }
     }
   }
 
@@ -203,7 +216,7 @@ export class EnemyAI {
     let nearest = null;
     let minDist = 400;
     for (const u of this.game.units) {
-      if (u.faction !== factionId && !u.isDead && !u.isDying) {
+      if (this.game.isHostile({ faction: factionId }, u) && !u.isDead && !u.isDying) {
         const d = Math.hypot(u.x - x, u.y - y);
         if (d < minDist) {
           minDist = d;

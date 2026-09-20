@@ -51,7 +51,7 @@
         <button id="btn-sound-toggle" class="hud-btn-small" title="Toggle Sound FX">🔊 Sound</button>
         <button id="btn-music-toggle" class="hud-btn-small" title="Toggle Medieval Music">🎵 Music</button>
         <button id="btn-menu-toggle" class="hud-btn-small" title="Game Settings & Pause (Esc)">⚙️ Menu</button>
-        <button id="btn-new-match" class="hud-btn-small" title="Match Setup (Kingdom & Map Selection)">⚔️ New Match</button>
+        <button id="btn-return-lobby" class="hud-btn-small" title="Match Lobby (Kingdom & Alliances)">🏠 Main Menu</button>
         <button id="btn-controls-help" class="hud-btn-small" title="View Controls & Shortcuts">❓ Help</button>
       </div>
     </header>
@@ -103,102 +103,127 @@
       </div>
     </footer>
 
-    <!-- Match Setup / Kingdom & Map Selection Modal -->
-    <div id="setup-modal" class="modal-overlay hidden">
-      <div class="modal-card setup-modal-card">
-        <div class="modal-header">
-          <h2>⚔️ Match Setup: Kingdom, Map & Enemies</h2>
-          <button id="btn-close-setup" class="close-btn">✕</button>
-        </div>
-        <div class="modal-body setup-modal-body">
-          <!-- 1. Kingdom Choice -->
-          <div class="setup-section-title">1. CHOOSE YOUR KINGDOM</div>
-          <div class="civ-grid">
-            <div class="civ-card active" data-civ="JAPANESE">
-              <div class="civ-card-header">
-                <span class="civ-crest">🌸</span>
-                <h4>Japanese Shogunate</h4>
-              </div>
-              <div class="civ-trait-title">Trait: Bushido Discipline</div>
-              <p class="civ-desc">+15% Swordsman & Knight attack damage, faster strike rate.</p>
-            </div>
-            <div class="civ-card" data-civ="KOREAN">
-              <div class="civ-card-header">
-                <span class="civ-crest">🏯</span>
-                <h4>Korean Joseon</h4>
-              </div>
-              <div class="civ-trait-title">Trait: Divine Artillery</div>
-              <p class="civ-desc">Fortress fires +2 extra arrows. Towers & Fortress have +25% range.</p>
-            </div>
-            <div class="civ-card" data-civ="CHINESE">
-              <div class="civ-card-header">
-                <span class="civ-crest">🐉</span>
-                <h4>Chinese Empire</h4>
-              </div>
-              <div class="civ-trait-title">Trait: Imperial Dynasty</div>
-              <p class="civ-desc">+3 Starting Villagers, -20% building wood cost, faster research.</p>
-            </div>
-            <div class="civ-card" data-civ="INDIAN">
-              <div class="civ-card-header">
-                <span class="civ-crest">🐘</span>
-                <h4>Indian Maurya</h4>
-              </div>
-              <div class="civ-trait-title">Trait: Armored Cavalry</div>
-              <p class="civ-desc">+30% Knight cavalry HP, farms provide +30% more food reserve.</p>
-            </div>
-          </div>
+    <!-- Standalone Main Menu & Match Setup Page (Visible on Load) -->
+    <div id="main-menu-page" class="main-menu-page">
+      <div class="main-menu-container">
+        <!-- Main Menu Header -->
+        <header class="main-menu-header">
+          <div class="title-emblem">⚔️</div>
+          <h1 class="main-title">EMPIRES OF THE EAST</h1>
+          <p class="main-subtitle">Choose your sovereign kingdom, configure alliances, and wage war on dynamically generated battlefields.</p>
+        </header>
 
-          <!-- 2. Map Selection -->
-          <div class="setup-section-title" style="margin-top: 14px;">2. CHOOSE BATTLEFIELD (80x80 EXPANDED REALM)</div>
-          <div class="map-grid">
-            <div class="map-card active" data-map="RIVER_VALLEY">
-              <div class="map-icon">🌊</div>
-              <div class="map-info">
-                <h4>River Valley</h4>
-                <p>Divided by a winding central river with 4-tile wide stone bridges and shallows.</p>
+        <!-- Main Menu Body -->
+        <div class="main-menu-content">
+          <!-- 1. Player Kingdom Selection -->
+          <section class="menu-section">
+            <div class="menu-section-header">
+              <span class="step-num">1</span>
+              <h3>CHOOSE YOUR KINGDOM</h3>
+            </div>
+            <div class="civ-grid" id="main-civ-grid">
+              <div class="civ-card active" data-civ="JAPANESE">
+                <div class="civ-card-header">
+                  <span class="civ-crest">🌸</span>
+                  <h4>Japanese Shogunate</h4>
+                </div>
+                <div class="civ-trait-title">Trait: Bushido Discipline</div>
+                <p class="civ-desc">+15% Swordsman & Knight attack damage, faster strike rate.</p>
+              </div>
+              <div class="civ-card" data-civ="KOREAN">
+                <div class="civ-card-header">
+                  <span class="civ-crest">🏯</span>
+                  <h4>Korean Joseon</h4>
+                </div>
+                <div class="civ-trait-title">Trait: Divine Artillery</div>
+                <p class="civ-desc">Fortress fires +2 extra arrows. Towers & Fortress have +25% range.</p>
+              </div>
+              <div class="civ-card" data-civ="CHINESE">
+                <div class="civ-card-header">
+                  <span class="civ-crest">🐉</span>
+                  <h4>Chinese Empire</h4>
+                </div>
+                <div class="civ-trait-title">Trait: Imperial Dynasty</div>
+                <p class="civ-desc">+3 Starting Villagers, -20% building wood cost, faster research.</p>
+              </div>
+              <div class="civ-card" data-civ="INDIAN">
+                <div class="civ-card-header">
+                  <span class="civ-crest">🐘</span>
+                  <h4>Indian Maurya</h4>
+                </div>
+                <div class="civ-trait-title">Trait: Armored Cavalry</div>
+                <p class="civ-desc">+30% Knight cavalry HP, farms provide +30% more food reserve.</p>
               </div>
             </div>
-            <div class="map-card" data-map="MOUNTAIN_PASS">
-              <div class="map-icon">⛰️</div>
-              <div class="map-info">
-                <h4>Mountain Pass</h4>
-                <p>Rocky crags, plateau fortifications, choke points, and rich veins of gold.</p>
-              </div>
-            </div>
-            <div class="map-card" data-map="DESERT_OASIS">
-              <div class="map-icon">🏜️</div>
-              <div class="map-info">
-                <h4>Desert Oasis</h4>
-                <p>Expansive dunes with fertile palm oases, wide flanks, and multi-front warfare.</p>
-              </div>
-            </div>
-          </div>
+          </section>
 
-          <!-- 3. Rivals Count & AI Difficulty -->
-          <div class="setup-options-row" style="margin-top: 14px;">
-            <div class="setup-option-item">
-              <label>Number of Rival Kingdoms:</label>
-              <select id="select-enemy-count" class="settings-select">
-                <option value="1">1 Rival Kingdom (1 vs 1)</option>
-                <option value="2">2 Rival Kingdoms (1 vs 2)</option>
-                <option value="3">3 Rival Kingdoms (1 vs 3)</option>
-                <option value="4" selected>4 Rival Kingdoms (1 vs 4 Grand War)</option>
-              </select>
+          <!-- 2. Opponents & Diplomacy (Allies vs Enemies) -->
+          <section class="menu-section">
+            <div class="menu-section-header">
+              <span class="step-num">2</span>
+              <h3>OPPONENTS & DIPLOMATIC ALLIANCES</h3>
+              <div id="diplomacy-badge" class="diplomacy-badge">⚔️ 1 vs 3 Total War</div>
             </div>
+            <div class="diplomacy-grid" id="diplomacy-grid">
+              <!-- Dynamically populated based on player selection -->
+            </div>
+          </section>
+
+          <!-- 3. Map Selection & Dynamic Sizing -->
+          <section class="menu-section">
+            <div class="menu-section-header">
+              <span class="step-num">3</span>
+              <h3>CHOOSE BATTLEFIELD</h3>
+              <div id="map-scale-badge" class="map-scale-badge">🗺️ Dynamic Realm: 80×80 (4 Kingdoms)</div>
+            </div>
+            <div class="map-grid" id="main-map-grid">
+              <div class="map-card active" data-map="RIVER_VALLEY">
+                <div class="map-icon">🌊</div>
+                <div class="map-info">
+                  <h4>River Valley</h4>
+                  <p>Divided by a winding procedural river with 4-tile wide stone bridges and shallows.</p>
+                </div>
+              </div>
+              <div class="map-card" data-map="MOUNTAIN_PASS">
+                <div class="map-icon">⛰️</div>
+                <div class="map-info">
+                  <h4>Mountain Pass</h4>
+                  <p>Rocky crags, mountain passes, plateau fortifications, and rich veins of gold.</p>
+                </div>
+              </div>
+              <div class="map-card" data-map="DESERT_OASIS">
+                <div class="map-icon">🏜️</div>
+                <div class="map-info">
+                  <h4>Desert Oasis</h4>
+                  <p>Expansive procedural dunes with fertile palm oases and wide flanking routes.</p>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <!-- 4. Match Rules & Difficulty -->
+          <section class="menu-section menu-section-options">
             <div class="setup-option-item">
-              <label>AI Difficulty:</label>
-              <select id="setup-difficulty" class="settings-select">
+              <label for="main-difficulty">AI Difficulty:</label>
+              <select id="main-difficulty" class="settings-select">
                 <option value="EASY">Easy (Scattered raids)</option>
                 <option value="NORMAL" selected>Normal (Tactical forces & towers)</option>
-                <option value="HARD">Hard (Heavy Cavalry & fast waves)</option>
+                <option value="HARD">Hard (Heavy Cavalry & rapid waves)</option>
               </select>
             </div>
-          </div>
+            <div class="match-summary-preview">
+              <span class="summary-label">Match Configuration:</span>
+              <strong id="main-match-summary" class="summary-val">Japanese Shogunate • 1 vs 3 Total War • River Valley (80×80)</strong>
+            </div>
+          </section>
         </div>
-        <div class="modal-footer" style="display: flex; justify-content: space-between; align-items: center;">
-          <span style="font-size: 0.85rem; color: var(--text-muted);">Selected: <strong id="setup-summary-text" style="color: var(--gold-light);">Japanese • River Valley • 4 Enemies</strong></span>
-          <button id="btn-start-custom-match" class="btn-primary" style="padding: 10px 24px; font-size: 1rem;">⚔️ Launch Campaign</button>
-        </div>
+
+        <!-- Main Menu Footer / Launch Button -->
+        <footer class="main-menu-footer">
+          <button id="btn-commence-battle" class="btn-commence-battle">
+            <span class="btn-sparkle">✨</span> COMMENCE BATTLE <span class="btn-sparkle">⚔️</span>
+          </button>
+        </footer>
       </div>
     </div>
 
@@ -231,8 +256,9 @@
             <button id="btn-settings-sound" class="hud-btn-small">🔊 On</button>
           </div>
         </div>
-        <div class="modal-footer" style="display: flex; justify-content: space-between;">
-          <button id="btn-restart-game" class="hud-btn-small" style="background: #7f1d1d; border-color: #ef4444; color: #fecaca;">🔄 Restart Current Match</button>
+        <div class="modal-footer" style="display: flex; justify-content: space-between; gap: 10px;">
+          <button id="btn-pause-lobby" class="hud-btn-small" style="background: #1e293b; border-color: #64748b; color: #f8fafc;">🏠 Main Menu</button>
+          <button id="btn-restart-game" class="hud-btn-small" style="background: #7f1d1d; border-color: #ef4444; color: #fecaca;">🔄 Restart Match</button>
           <button id="btn-resume-game" class="btn-primary">Resume Game</button>
         </div>
       </div>
@@ -260,8 +286,8 @@
           </div>
         </div>
         <div class="modal-footer" style="text-align: center; justify-content: center; display: flex; gap: 12px;">
-          <button id="btn-play-again" class="btn-primary" style="font-size: 1.05rem; padding: 10px 24px;">⚔️ Play Again</button>
-          <button id="btn-game-over-setup" class="hud-btn-small" style="font-size: 1rem; padding: 10px 20px;">🗺️ Change Map / Civ</button>
+          <button id="btn-play-again" class="btn-primary" style="font-size: 1.05rem; padding: 10px 24px;">⚔️ Rematch</button>
+          <button id="btn-game-over-setup" class="hud-btn-small" style="font-size: 1rem; padding: 10px 20px;">🏠 Main Menu</button>
         </div>
       </div>
     </div>

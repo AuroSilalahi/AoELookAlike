@@ -806,3 +806,317 @@ body, html {
   text-transform: uppercase;
   letter-spacing: 0.5px;
 }
+
+/* ========================================================== */
+/* STANDALONE MAIN MENU & MATCH SETUP PAGE */
+/* ========================================================== */
+.main-menu-page {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: radial-gradient(circle at center, #171f2e 0%, #0a0d14 70%, #040508 100%);
+  overflow-y: auto;
+  padding: 24px 16px;
+  animation: fadeInMenu 0.4s ease-out;
+}
+
+.main-menu-page.hidden {
+  display: none !important;
+}
+
+@keyframes fadeInMenu {
+  from { opacity: 0; transform: scale(0.98); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+.main-menu-container {
+  width: 100%;
+  max-width: 1040px;
+  background: rgba(15, 20, 30, 0.96);
+  border: 2px solid #5a4630;
+  border-radius: 12px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.92), 0 0 35px rgba(212, 175, 55, 0.2);
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 26px 30px;
+  backdrop-filter: blur(10px);
+}
+
+.main-menu-header {
+  text-align: center;
+  border-bottom: 1px solid rgba(212, 175, 55, 0.3);
+  padding-bottom: 16px;
+}
+
+.title-emblem {
+  font-size: 2.2rem;
+  margin-bottom: 4px;
+}
+
+.main-title {
+  font-family: var(--font-serif);
+  font-size: 2.3rem;
+  font-weight: 900;
+  letter-spacing: 2.5px;
+  background: linear-gradient(135deg, #fef08a 0%, #d4af37 50%, #997d26 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  margin-bottom: 6px;
+}
+
+.main-subtitle {
+  font-size: 0.95rem;
+  color: #94a3b8;
+  max-width: 700px;
+  margin: 0 auto;
+}
+
+.main-menu-content {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.menu-section {
+  background: rgba(22, 28, 40, 0.7);
+  border: 1px solid rgba(212, 175, 55, 0.22);
+  border-radius: 8px;
+  padding: 14px 16px;
+}
+
+.menu-section-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.step-num {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: #2a2215;
+  border: 1px solid var(--gold-accent);
+  color: var(--gold-light);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-serif);
+  font-weight: 700;
+  font-size: 0.8rem;
+}
+
+.menu-section-header h3 {
+  font-family: var(--font-serif);
+  font-size: 0.95rem;
+  font-weight: 700;
+  letter-spacing: 1px;
+  color: var(--gold-light);
+  flex: 1;
+}
+
+.diplomacy-badge {
+  font-size: 0.82rem;
+  font-weight: 700;
+  padding: 4px 12px;
+  border-radius: 20px;
+  background: rgba(220, 38, 38, 0.2);
+  border: 1px solid #ef4444;
+  color: #fca5a5;
+  letter-spacing: 0.5px;
+}
+
+.diplomacy-badge.allied {
+  background: rgba(6, 182, 212, 0.2);
+  border-color: #06b6d4;
+  color: #a5f3fc;
+}
+
+.map-scale-badge {
+  font-size: 0.82rem;
+  font-weight: 600;
+  padding: 4px 12px;
+  border-radius: 20px;
+  background: rgba(59, 130, 246, 0.2);
+  border: 1px solid #3b82f6;
+  color: #93c5fd;
+}
+
+/* DIPLOMACY GRID & CARDS */
+.diplomacy-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+}
+
+.diplomacy-card {
+  background: rgba(18, 23, 33, 0.85);
+  border: 2px solid #334155;
+  border-radius: 8px;
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  transition: all 0.2s ease;
+}
+
+.diplomacy-card.active-opponent {
+  border-color: #475569;
+}
+
+.diplomacy-card.disabled-opponent {
+  opacity: 0.45;
+  border-style: dashed;
+}
+
+.diplomacy-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.opponent-info {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.opponent-crest {
+  font-size: 1.4rem;
+}
+
+.opponent-name {
+  font-family: var(--font-serif);
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: #fff;
+}
+
+.opponent-toggle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.78rem;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+
+.opponent-toggle input[type="checkbox"] {
+  cursor: pointer;
+  accent-color: var(--gold-accent);
+  width: 16px;
+  height: 16px;
+}
+
+.stance-selector {
+  display: flex;
+  gap: 6px;
+  background: rgba(10, 14, 22, 0.6);
+  padding: 3px;
+  border-radius: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.btn-stance {
+  flex: 1;
+  padding: 6px 4px;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  font-size: 0.76rem;
+  font-weight: 700;
+  cursor: pointer;
+  background: transparent;
+  color: var(--text-muted);
+  transition: all 0.15s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+}
+
+.btn-stance:hover {
+  color: #fff;
+}
+
+.btn-stance.stance-enemy.active {
+  background: linear-gradient(180deg, #991b1b 0%, #7f1d1d 100%);
+  border-color: #ef4444;
+  color: #fee2e2;
+  box-shadow: 0 0 10px rgba(239, 68, 68, 0.5);
+}
+
+.btn-stance.stance-ally.active {
+  background: linear-gradient(180deg, #0e7490 0%, #155e75 100%);
+  border-color: #06b6d4;
+  color: #cffafe;
+  box-shadow: 0 0 10px rgba(6, 182, 212, 0.5);
+}
+
+/* OPTIONS ROW */
+.menu-section-options {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 14px;
+}
+
+.match-summary-preview {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.summary-label {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  text-transform: uppercase;
+}
+
+.summary-val {
+  font-size: 0.95rem;
+  color: var(--gold-light);
+}
+
+/* COMMENCE BATTLE BUTTON */
+.main-menu-footer {
+  text-align: center;
+  padding-top: 6px;
+}
+
+.btn-commence-battle {
+  width: 100%;
+  max-width: 480px;
+  height: 52px;
+  border-radius: 8px;
+  border: 2px solid #fef08a;
+  background: linear-gradient(180deg, #d97706 0%, #b45309 50%, #78350f 100%);
+  font-family: var(--font-serif);
+  font-size: 1.25rem;
+  font-weight: 900;
+  letter-spacing: 2px;
+  color: #fff;
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.8);
+  cursor: pointer;
+  box-shadow: 0 6px 20px rgba(180, 83, 9, 0.6), 0 0 25px rgba(251, 191, 36, 0.35);
+  transition: all 0.2s ease;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.btn-commence-battle:hover {
+  transform: translateY(-2px);
+  background: linear-gradient(180deg, #f59e0b 0%, #d97706 50%, #92400e 100%);
+  box-shadow: 0 8px 25px rgba(180, 83, 9, 0.8), 0 0 35px rgba(251, 191, 36, 0.55);
+}
+
+.btn-commence-battle:active {
+  transform: translateY(1px);
+}
+

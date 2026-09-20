@@ -606,9 +606,10 @@ export class Unit extends Entity {
     let nearest = null;
     let minDist = this.sightRadius;
 
-    // Check hostile units (any unit with a different faction)
+    // Check hostile units (using diplomacy relations)
     for (const u of game.units) {
-      if (u.faction !== this.faction && !u.isDead && !u.isDying) {
+      const isEnemy = game.isHostile ? game.isHostile(this, u) : (u.faction !== this.faction);
+      if (isEnemy && !u.isDead && !u.isDying) {
         if (this.faction === 'PLAYER' && game.fog && !game.fog.isVisible(u.x, u.y)) {
           continue;
         }
@@ -623,7 +624,8 @@ export class Unit extends Entity {
     // Check hostile buildings if no units nearby
     if (!nearest) {
       for (const b of game.buildings) {
-        if (b.faction !== this.faction && !b.isDead) {
+        const isEnemy = game.isHostile ? game.isHostile(this, b) : (b.faction !== this.faction);
+        if (isEnemy && !b.isDead) {
           if (this.faction === 'PLAYER' && game.fog && !game.fog.isVisible(b.x, b.y)) {
             continue;
           }
@@ -731,18 +733,27 @@ export class Unit extends Entity {
     let primaryColor = '#2563eb';
     let secondaryColor = '#1d4ed8';
 
-    if (this.faction === 'ENEMY_1') {
+    if (this.customColor) {
+      primaryColor = this.customColor;
+      secondaryColor = this.customColor;
+    } else if (this.faction === 'PLAYER') {
+      primaryColor = '#2563eb';
+      secondaryColor = '#1d4ed8';
+    } else if (this.isAlly) {
+      primaryColor = '#06b6d4'; // Cyan for Allied units
+      secondaryColor = '#0891b2';
+    } else if (this.faction === 'ENEMY_1' || this.faction.includes('JAPANESE')) {
       primaryColor = '#dc2626'; // Crimson Red
       secondaryColor = '#991b1b';
-    } else if (this.faction === 'ENEMY_2') {
+    } else if (this.faction === 'ENEMY_2' || this.faction.includes('KOREAN')) {
       primaryColor = '#9333ea'; // Amethyst Purple
       secondaryColor = '#6b21a8';
-    } else if (this.faction === 'ENEMY_3') {
+    } else if (this.faction === 'ENEMY_3' || this.faction.includes('CHINESE')) {
       primaryColor = '#ea580c'; // Solar Orange
       secondaryColor = '#c2410c';
-    } else if (this.faction === 'ENEMY_4') {
-      primaryColor = '#0d9488'; // Verdant Teal
-      secondaryColor = '#0f766e';
+    } else if (this.faction === 'ENEMY_4' || this.faction.includes('INDIAN')) {
+      primaryColor = '#16a34a'; // Emerald Green
+      secondaryColor = '#15803d';
     }
 
     if (this.unitType === 'KNIGHT') {

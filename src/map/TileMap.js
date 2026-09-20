@@ -20,122 +20,199 @@ export class TileMap {
     this.grid = new Uint8Array(cols * rows);
     this.waterTime = 0;
 
-    this.generateMap(mapType);
+    this.generateMap(mapType, cols, rows);
   }
 
-  generateMap(mapType = 'RIVER_VALLEY') {
+  generateMap(mapType = 'RIVER_VALLEY', cols = 80, rows = 80, basePoints = []) {
+    this.cols = cols;
+    this.rows = rows;
+    this.width = cols * this.tileSize;
+    this.height = rows * this.tileSize;
+    this.grid = new Uint8Array(cols * rows);
     this.mapType = mapType;
-    this.grid.fill(TILE_TYPES.GRASS);
+    this.basePoints = basePoints;
 
     if (mapType === 'MOUNTAIN_PASS') {
-      this.generateMountainPass();
+      this.generateMountainPass(basePoints);
     } else if (mapType === 'DESERT_OASIS') {
-      this.generateDesertOasis();
+      this.generateDesertOasis(basePoints);
     } else {
-      this.generateRiverValley();
+      this.generateRiverValley(basePoints);
+    }
+
+    // Always pave clear cobblestone grounds under every active kingdom base
+    for (const b of basePoints) {
+      this.buildCobbleBase(b.col, b.row, 7);
     }
   }
 
-  generateRiverValley() {
-    // 1. Natural dirt pathways
+  generateRiverValley(basePoints = []) {
+    this.grid.fill(TILE_TYPES.GRASS);
+
+    // 1. Procedural dirt pathways and terrain texture
+    const dirtPhaseX = Math.random() * 10;
+    const dirtPhaseY = Math.random() * 10;
     for (let c = 0; c < this.cols; c++) {
       for (let r = 0; r < this.rows; r++) {
-        const noise = Math.sin(c * 0.18) + Math.cos(r * 0.18);
-        if (noise > 1.35) {
+        const noise = Math.sin((c + dirtPhaseX) * 0.16) + Math.cos((r + dirtPhaseY) * 0.16);
+        if (noise > 1.32) {
           this.setTile(c, r, TILE_TYPES.DIRT);
         }
       }
     }
 
-    // 2. Base cobblestones for player (bottom-left) and enemies (top-right, top-left, bottom-right)
-    this.buildCobbleBase(10, 10, 8); // Quadrant 1 (Top-Left)
-    this.buildCobbleBase(65, 10, 8); // Quadrant 2 (Top-Right)
-    this.buildCobbleBase(10, 65, 8); // Player Base (Bottom-Left)
-    this.buildCobbleBase(65, 65, 8); // Quadrant 4 (Bottom-Right)
+    // 2. Procedural River with randomized curves and flow
+    const isHorizontal = Math.random() > 0.35;
+    const riverFreq = 0.08 + Math.random() * 0.08;
+    const riverPhase = Math.random() * Math.PI * 2;
+    const riverAmp = 4 + Math.random() * 4;
 
-    // 3. Central Dividing River with winding curves
-    for (let c = 0; c < this.cols; c++) {
-      const riverR = Math.floor(this.rows * 0.5 + Math.sin(c * 0.12) * 6);
-      for (let offset = -2; offset <= 2; offset++) {
-        const r = riverR + offset;
-        if (r >= 0 && r < this.rows) {
-          this.setTile(c, r, TILE_TYPES.WATER);
+    if (isHorizontal) {
+      // River flows across columns (West to East)
+      const riverCenterR = Math.floor(this.rows * 0.5);
+      for (let c = 0; c < this.cols; c++) {
+        const riverR = Math.floor(riverCenterR + Math.sin(c * riverFreq + riverPhase) * riverAmp);
+        for (let offset = -2; offset <= 2; offset++) {
+          const r = riverR + offset;
+          if (r >= 0 && r < this.rows) {
+            // Avoid drowning any kingdom base
+            const tooClose = basePoints.some(b => Math.hypot(c - b.col, r - b.row) < 9);
+            if (!tooClose) {
+              this.setTile(c, r, TILE_TYPES.WATER);
+            }
+          }
         }
       }
-    }
 
-    // 4. WIDE 4-TILE STONE BRIDGES & SHALLOWS (Never bottleneck!)
-    // Western Bridge (c: 18 to 22)
-    this.buildBridge(18, Math.floor(this.rows * 0.5 - 4), 5, 9);
-    // Central Grand Bridge (c: 38 to 43)
-    this.buildBridge(38, Math.floor(this.rows * 0.5 - 4), 6, 9);
-    // Eastern Bridge (c: 58 to 63)
-    this.buildBridge(58, Math.floor(this.rows * 0.5 - 4), 5, 9);
+      // Build 3 to 4 WIDE 5-TILE STONE BRIDGES across the river
+      const bridgeCols = [
+        Math.floor(this.cols * 0.22),
+        Math.floor(this.cols * 0.50),
+        Math.floor(this.cols * 0.78)
+      ];
+      if (this.cols >= 75) {
+        bridgeCols.push(Math.floor(this.cols * 0.36));
+      }
+
+      for (const bc of bridgeCols) {
+        const rMid = Math.floor(riverCenterR + Math.sin(bc * riverFreq + riverPhase) * riverAmp);
+        this.buildBridge(bc - 2, rMid - 5, 5, 11);
+      }
+    } else {
+      // River flows vertically (North to South)
+      const riverCenterC = Math.floor(this.cols * 0.5);
+      for (let r = 0; r < this.rows; r++) {
+        const riverC = Math.floor(riverCenterC + Math.sin(r * riverFreq + riverPhase) * riverAmp);
+        for (let offset = -2; offset <= 2; offset++) {
+          const c = riverC + offset;
+          if (c >= 0 && c < this.cols) {
+            const tooClose = basePoints.some(b => Math.hypot(c - b.col, r - b.row) < 9);
+            if (!tooClose) {
+              this.setTile(c, r, TILE_TYPES.WATER);
+            }
+          }
+        }
+      }
+
+      // Build WIDE 5-TILE STONE BRIDGES horizontally across vertical river
+      const bridgeRows = [
+        Math.floor(this.rows * 0.22),
+        Math.floor(this.rows * 0.50),
+        Math.floor(this.rows * 0.78)
+      ];
+      if (this.rows >= 75) {
+        bridgeRows.push(Math.floor(this.rows * 0.36));
+      }
+
+      for (const br of bridgeRows) {
+        const cMid = Math.floor(riverCenterC + Math.sin(br * riverFreq + riverPhase) * riverAmp);
+        this.buildBridge(cMid - 5, br - 2, 11, 5);
+      }
+    }
   }
 
-  generateMountainPass() {
-    // Mountainous ground (Dirt & Cobblestone)
+  generateMountainPass(basePoints = []) {
+    // Rocky ground with varied cobblestone and dirt
     for (let i = 0; i < this.grid.length; i++) {
       this.grid[i] = Math.random() > 0.4 ? TILE_TYPES.DIRT : TILE_TYPES.COBBLE;
     }
 
-    this.buildCobbleBase(12, 12, 8);
-    this.buildCobbleBase(64, 12, 8);
-    this.buildCobbleBase(12, 64, 8);
-    this.buildCobbleBase(64, 64, 8);
+    // High Mountain Cliff Ridge dividing the realm with procedural passes
+    const spineCol = Math.floor(this.cols * 0.5 + (Math.random() - 0.5) * 6);
+    const passInterval = Math.floor(this.rows / 4);
 
-    // High Mountain Cliff Ridges dividing sectors
     for (let r = 0; r < this.rows; r++) {
-      // Central vertical cliff ridge with 3 wide passes
-      if ((r < 18 || r > 26) && (r < 36 || r > 44) && (r < 54 || r > 62)) {
-        for (let c = 38; c <= 42; c++) {
-          this.setTile(c, r, TILE_TYPES.CLIFF);
+      // Determine if this row is a wide pass
+      const isPass = (r % passInterval > 2 && r % passInterval < 8) || (r < 6) || (r > this.rows - 7);
+      if (!isPass) {
+        for (let c = spineCol - 2; c <= spineCol + 2; c++) {
+          const tooClose = basePoints.some(b => Math.hypot(c - b.col, r - b.row) < 8);
+          if (!tooClose) {
+            this.setTile(c, r, TILE_TYPES.CLIFF);
+          }
         }
       } else {
-        // Wide Paved Stone Pass
-        for (let c = 36; c <= 44; c++) {
+        // Paved wide stone pass
+        for (let c = spineCol - 4; c <= spineCol + 4; c++) {
           this.setTile(c, r, TILE_TYPES.BRIDGE);
         }
       }
     }
 
-    // Horizontal Chasm with Bridges
+    // Horizontal mountain ravine with wide stone bridges
+    const ravineRow = Math.floor(this.rows * 0.5 + (Math.random() - 0.5) * 6);
+    const bridgeSpans = [
+      Math.floor(this.cols * 0.24),
+      Math.floor(this.cols * 0.76)
+    ];
+
     for (let c = 0; c < this.cols; c++) {
-      const chasmR = 40;
-      if (c >= 18 && c <= 23) {
-        this.buildBridge(c, chasmR - 3, 1, 7);
-      } else if (c >= 56 && c <= 61) {
-        this.buildBridge(c, chasmR - 3, 1, 7);
+      const nearBridge = bridgeSpans.some(bc => Math.abs(c - bc) <= 3);
+      if (nearBridge) {
+        this.buildBridge(c, ravineRow - 3, 1, 7);
       } else {
         for (let offset = -2; offset <= 2; offset++) {
-          this.setTile(c, chasmR + offset, TILE_TYPES.WATER); // Deep mountain ravine
+          const r = ravineRow + offset;
+          const tooClose = basePoints.some(b => Math.hypot(c - b.col, r - b.row) < 8);
+          if (!tooClose) {
+            this.setTile(c, r, TILE_TYPES.WATER);
+          }
         }
       }
     }
   }
 
-  generateDesertOasis() {
+  generateDesertOasis(basePoints = []) {
     this.grid.fill(TILE_TYPES.SAND);
 
-    // Fertile green oases around bases
-    this.buildGreenOasis(14, 14, 12);
-    this.buildGreenOasis(64, 14, 12);
-    this.buildGreenOasis(14, 64, 12);
-    this.buildGreenOasis(64, 64, 12);
+    // Number of oases depends on realm size (2 to 4)
+    const oasisCount = this.cols >= 75 ? 4 : (this.cols >= 60 ? 3 : 2);
+    const oases = [];
 
-    // Central Grand Oasis Lake with lush shores
-    this.buildGreenOasis(40, 40, 16);
-    for (let c = 34; c <= 46; c++) {
-      for (let r = 34; r <= 46; r++) {
-        if (Math.hypot(c - 40, r - 40) < 8) {
-          this.setTile(c, r, TILE_TYPES.WATER);
-        }
-      }
+    // Procedurally scatter oases avoiding bases and edges
+    for (let i = 0; i < oasisCount; i++) {
+      const angle = (i / oasisCount) * Math.PI * 2 + (Math.random() - 0.5) * 0.5;
+      const dist = this.cols * (0.22 + Math.random() * 0.18);
+      const oc = Math.floor(this.cols * 0.5 + Math.cos(angle) * dist);
+      const or = Math.floor(this.rows * 0.5 + Math.sin(angle) * dist);
+      oases.push({ c: oc, r: or, radius: 7 + Math.floor(Math.random() * 4) });
     }
 
-    // Wide Stone causeways through the central oasis
-    this.buildBridge(38, 32, 5, 17);
-    this.buildBridge(32, 38, 17, 5);
+    // Build lush oases with lakes and causeways
+    for (const oasis of oases) {
+      this.buildGreenOasis(oasis.c, oasis.r, oasis.radius);
+      const lakeR = Math.max(3, Math.floor(oasis.radius * 0.55));
+      for (let c = oasis.c - lakeR; c <= oasis.c + lakeR; c++) {
+        for (let r = oasis.r - lakeR; r <= oasis.r + lakeR; r++) {
+          if (Math.hypot(c - oasis.c, r - oasis.r) <= lakeR) {
+            this.setTile(c, r, TILE_TYPES.WATER);
+          }
+        }
+      }
+      // Wide stone causeway crossing the oasis lake
+      this.buildBridge(oasis.c - 2, oasis.r - lakeR - 2, 5, lakeR * 2 + 5);
+      this.buildBridge(oasis.c - lakeR - 2, oasis.r - 2, lakeR * 2 + 5, 5);
+    }
   }
 
   buildCobbleBase(centerCol, centerRow, radius) {

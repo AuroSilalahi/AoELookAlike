@@ -7,7 +7,7 @@ import { Effects } from './engine/Effects.js';
 import { Unit } from './entities/Unit.js';
 import { Building, BUILDING_TYPES, UPGRADE_CONFIG } from './entities/Building.js';
 import { ResourceNode } from './entities/ResourceNode.js';
-import { HUD } from './ui/HUD.js';
+import { HUD, KINGDOMS } from './ui/HUD.js';
 import { SoundFX } from './audio/SoundFX.js';
 import { EnemyAI, ENEMY_FACTIONS } from './ai/EnemyAI.js';
 
@@ -21,10 +21,12 @@ export class Game {
     this.enemyAI = new EnemyAI(this);
     this.effects = new Effects();
 
-    // Match Config
+    // Match Config & Diplomacy
     this.playerCiv = 'JAPANESE';
     this.mapType = 'RIVER_VALLEY';
     this.enemyCount = 4;
+    this.factions = {};
+    this.hasStarted = false;
 
     // Player State & Tech
     this.player = {
@@ -46,7 +48,7 @@ export class Game {
     this.isGameOver = false;
     this.lastAlertPos = { x: 650, y: 3150 };
 
-    // World & Systems (80x80 tiles = 3840 x 3840 px)
+    // World & Systems
     this.map = new TileMap(80, 80, 48, this.mapType);
     this.fog = new FogOfWar(80, 80, 48);
     this.pathfinder = new Pathfinder(this.map);
@@ -80,10 +82,47 @@ export class Game {
 
     this.setupInputHandlers();
 
-    // Start default match
-    this.startNewMatch(this.playerCiv, this.mapType, this.enemyCount, 'NORMAL');
+    // Standby: Wait for player to configure and launch in Main Menu
+    this.hasStarted = false;
 
     requestAnimationFrame((t) => this.loop(t));
+  }
+
+  isHostile(entityA, entityB) {
+    if (!entityA || !entityB) return false;
+    const fA = entityA.faction;
+    const fB = entityB.faction;
+    if (fA === fB) return false;
+
+    const infoA = this.factions[fA];
+    const infoB = this.factions[fB];
+    if (!infoA || !infoB) return fA !== fB;
+
+    // Both belong to player team (Player & Allies)
+    if (infoA.team === 'TEAM_PLAYER' && infoB.team === 'TEAM_PLAYER') {
+      return false;
+    }
+
+    // One is on player team and other is not
+    if (infoA.team === 'TEAM_PLAYER' || infoB.team === 'TEAM_PLAYER') {
+      return true;
+    }
+
+    // Both are enemy AIs (cooperate against player & allies)
+    return false;
+  }
+
+  isAllied(entityA, entityB) {
+    if (!entityA || !entityB) return false;
+    const fA = entityA.faction;
+    const fB = entityB.faction;
+    if (fA === fB) return true;
+
+    const infoA = this.factions[fA];
+    const infoB = this.factions[fB];
+    if (!infoA || !infoB) return false;
+
+    return infoA.team === 'TEAM_PLAYER' && infoB.team === 'TEAM_PLAYER';
   }
 
   resizeCanvas() {
@@ -91,18 +130,88 @@ export class Game {
     this.canvas.height = window.innerHeight;
   }
 
-  startNewMatch(civId = 'JAPANESE', mapType = 'RIVER_VALLEY', enemyCount = 4, difficulty = 'NORMAL') {
+  startNewMatch(configOrCiv = 'JAPANESE', mapType = 'RIVER_VALLEY', enemyCount = 4, difficulty = 'NORMAL') {
+    let civId = 'JAPANESE';
+    let opponents = [];
+    let diff = 'NORMAL';
+    let mType = 'RIVER_VALLEY';
+
+    if (typeof configOrCiv === 'object' && configOrCiv !== null) {
+      civId = configOrCiv.playerCiv || 'JAPANESE';
+      mType = configOrCiv.mapType || 'RIVER_VALLEY';
+      diff = configOrCiv.difficulty || 'NORMAL';
+      opponents = configOrCiv.opponents || [];
+    } else {
+      civId = configOrCiv;
+      mType = mapType;
+      diff = difficulty;
+      const allCivs = ['JAPANESE', 'KOREAN', 'CHINESE', 'INDIAN'];
+      const otherCivs = allCivs.filter(c => c !== civId);
+      const count = Math.min(otherCivs.length, enemyCount);
+      opponents = otherCivs.slice(0, count).map(c => ({ civId: c, stance: 'ENEMY' }));
+    }
+
     this.playerCiv = civId;
-    this.mapType = mapType;
-    this.enemyCount = Math.max(1, Math.min(4, enemyCount));
+    this.mapType = mType;
     this.isGameOver = false;
     this.elapsedSeconds = 0;
     this.stats = { time: 0, trained: 5, vanquished: 0 };
     this.playerUpgrades.clear();
 
-    // 1. Rebuild Map & World Systems
-    this.map.generateMap(mapType);
-    this.fog = new FogOfWar(80, 80, 48);
+    // 1. Dynamic Map Sizing based on nation count
+    // 2 Nations = 50x50, 3 Nations = 65x65, 4 Nations = 80x80
+    const totalNations = 1 + opponents.length;
+    let cols = 80;
+    let rows = 80;
+    if (totalNations <= 2) {
+      cols = 50;
+      rows = 50;
+    } else if (totalNations === 3) {
+      cols = 65;
+      rows = 65;
+    } else {
+      cols = 80;
+      rows = 80;
+    }
+
+    // 2. Procedural Candidate Base Sectors with random jitter and shuffling
+    const candidateSectors = [
+      { col: Math.floor(cols * 0.18), row: Math.floor(rows * 0.82) }, // SW
+      { col: Math.floor(cols * 0.82), row: Math.floor(rows * 0.18) }, // NE
+      { col: Math.floor(cols * 0.18), row: Math.floor(rows * 0.18) }, // NW
+      { col: Math.floor(cols * 0.82), row: Math.floor(rows * 0.82) }  // SE
+    ];
+
+    for (const s of candidateSectors) {
+      s.col += Math.floor((Math.random() - 0.5) * 4);
+      s.row += Math.floor((Math.random() - 0.5) * 4);
+      s.col = Math.max(8, Math.min(cols - 9, s.col));
+      s.row = Math.max(8, Math.min(rows - 9, s.row));
+    }
+
+    const shuffledSectors = [...candidateSectors].sort(() => Math.random() - 0.5);
+
+    const playerBasePoint = {
+      col: shuffledSectors[0].col,
+      row: shuffledSectors[0].row,
+      x: shuffledSectors[0].col * 48,
+      y: shuffledSectors[0].row * 48
+    };
+
+    const opponentBasePoints = opponents.map((opp, idx) => ({
+      ...opp,
+      factionId: 'AI_' + opp.civId,
+      col: shuffledSectors[idx + 1].col,
+      row: shuffledSectors[idx + 1].row,
+      x: shuffledSectors[idx + 1].col * 48,
+      y: shuffledSectors[idx + 1].row * 48
+    }));
+
+    const allBasePoints = [playerBasePoint, ...opponentBasePoints];
+
+    // 3. Rebuild Map & World Systems
+    this.map.generateMap(mType, cols, rows, allBasePoints);
+    this.fog = new FogOfWar(cols, rows, 48);
     this.pathfinder = new Pathfinder(this.map);
     this.camera = new Camera(this.canvas, this.map.width, this.map.height);
     this.input.camera = this.camera;
@@ -115,7 +224,7 @@ export class Game {
     this.selectedEntities = [];
     this.cancelPlacement();
 
-    // 2. Initialize Resources with Civ bonuses
+    // 4. Initialize Resources with Civ bonuses
     this.player = {
       food: civId === 'CHINESE' ? 320 : 300,
       wood: civId === 'CHINESE' ? 280 : 250,
@@ -124,120 +233,174 @@ export class Game {
       maxPop: 10
     };
 
-    // 3. Initialize AI
-    this.enemyAI.setDifficulty(difficulty);
-    this.enemyAI.initFactions(this.enemyCount);
+    // 5. Build Diplomacy Dictionary
+    this.factions = {
+      PLAYER: {
+        id: 'PLAYER',
+        civ: civId,
+        team: 'TEAM_PLAYER',
+        diplomacy: 'PLAYER',
+        isPlayer: true,
+        color: '#2563eb',
+        name: KINGDOMS[civId]?.name || 'Player'
+      }
+    };
 
-    // 4. Spawn Player & Enemy Kingdoms
-    this.spawnKingdomsAndResources();
+    for (const opp of opponentBasePoints) {
+      const isAlly = (opp.stance === 'ALLY');
+      this.factions[opp.factionId] = {
+        id: opp.factionId,
+        civ: opp.civId,
+        team: isAlly ? 'TEAM_PLAYER' : 'TEAM_ENEMY',
+        diplomacy: opp.stance,
+        isPlayer: false,
+        color: isAlly ? '#06b6d4' : (KINGDOMS[opp.civId]?.color || '#dc2626'),
+        name: KINGDOMS[opp.civId]?.name || opp.civId
+      };
+    }
 
-    // 5. Update HUD Banner
+    // 6. Initialize AI
+    this.enemyAI.setDifficulty(diff);
+    this.enemyAI.initFactions(opponentBasePoints.map(opp => ({
+      id: opp.factionId,
+      civ: opp.civId,
+      name: this.factions[opp.factionId].name,
+      color: this.factions[opp.factionId].color,
+      diplomacy: opp.stance
+    })));
+
+    // 7. Spawn Player & Opponent Kingdoms
+    this.spawnKingdomsAndResources(playerBasePoint, opponentBasePoints, cols, rows);
+
+    // 8. Update HUD Banner
     this.hud.setCivilizationBanner(civId);
-    this.hud.showAlert(`⚔️ Campaign started as ${this.hud.civName.textContent} on ${mapType.replace('_', ' ')}!`);
+    this.hud.showAlert(`⚔️ Campaign started as ${KINGDOMS[civId]?.name} on ${mType.replace('_', ' ')}!`);
 
     // Focus Camera on Player Town Center
-    this.camera.x = 650;
-    this.camera.y = 3150;
+    this.camera.x = playerBasePoint.x;
+    this.camera.y = playerBasePoint.y;
     this.camera.clamp();
 
-    // Initial Fog of War calculation
-    const friendlyUnits = this.units.filter(u => u.faction === 'PLAYER');
-    const friendlyBuildings = this.buildings.filter(b => b.faction === 'PLAYER');
+    // Initial Fog of War calculation (Shared vision with Allies)
+    const friendlyUnits = this.units.filter(u => this.isAllied(u, { faction: 'PLAYER' }));
+    const friendlyBuildings = this.buildings.filter(b => this.isAllied(b, { faction: 'PLAYER' }));
     this.fog.update(friendlyUnits, friendlyBuildings);
+
+    this.hasStarted = true;
   }
 
-  spawnKingdomsAndResources() {
+  spawnKingdomsAndResources(playerBase, opponentBases = [], cols = 80, rows = 80) {
+    const pX = playerBase.x;
+    const pY = playerBase.y;
+
     // ==========================================
-    // 1. PLAYER BASE (Bottom-Left Sector: 650, 3150)
+    // 1. PLAYER BASE (Randomized Quadrant)
     // ==========================================
-    const pX = 650;
-    const pY = 3150;
     const playerTC = new Building(pX, pY, 'TOWN_CENTER', 'PLAYER', true);
     this.buildings.push(playerTC);
 
     // Starting Units (Chinese gets +3 starting villagers!)
     const vilCount = this.playerCiv === 'CHINESE' ? 6 : 3;
     for (let i = 0; i < vilCount; i++) {
-      const v = new Unit(pX - 60 + i * 26, pY + 70 + (i % 2) * 20, 'VILLAGER', 'PLAYER');
+      const v = new Unit(pX - 50 + i * 26, pY + 60 + (i % 2) * 20, 'VILLAGER', 'PLAYER');
       v.applyCivBonuses(this.playerCiv);
       this.units.push(v);
     }
-    const s1 = new Unit(pX + 60, pY + 80, 'SWORDSMAN', 'PLAYER');
-    const s2 = new Unit(pX + 90, pY + 95, 'SWORDSMAN', 'PLAYER');
+    const s1 = new Unit(pX + 50, pY + 70, 'SWORDSMAN', 'PLAYER');
+    const s2 = new Unit(pX + 80, pY + 85, 'SWORDSMAN', 'PLAYER');
     s1.applyCivBonuses(this.playerCiv);
     s2.applyCivBonuses(this.playerCiv);
     this.units.push(s1);
     this.units.push(s2);
 
-    // Surrounding Player Forests (Abundant 220 Wood trees!)
-    this.spawnForestGrove(pX - 180, pY - 80, 10, 220);
-    this.spawnForestGrove(pX - 80, pY - 180, 10, 220);
-    // Player Gold Mines (600 Gold each)
-    this.resources.push(new ResourceNode(pX + 180, pY - 80, 'GOLD', 600));
-    this.resources.push(new ResourceNode(pX + 230, pY - 50, 'GOLD', 550));
-    // Berry Bushes
-    this.resources.push(new ResourceNode(pX + 160, pY + 120, 'FOOD', 300));
-    this.resources.push(new ResourceNode(pX + 200, pY + 150, 'FOOD', 300));
+    // Surrounding Player Starter Resources
+    this.spawnForestGrove(pX - 140, pY - 70, 9, 240);
+    this.resources.push(new ResourceNode(pX + 140, pY - 70, 'GOLD', 650));
+    this.resources.push(new ResourceNode(pX + 180, pY - 40, 'GOLD', 600));
+    this.resources.push(new ResourceNode(pX + 130, pY + 110, 'FOOD', 320));
+    this.resources.push(new ResourceNode(pX + 165, pY + 135, 'FOOD', 320));
 
     // ==========================================
-    // 2. ENEMY BASES (Up to 4 Factions in other quadrants)
+    // 2. OPPONENT BASES (Allies & Enemies in other quadrants)
     // ==========================================
-    const enemySpawns = [
-      { id: 'ENEMY_1', x: 3150, y: 650 },  // Top-Right
-      { id: 'ENEMY_2', x: 650, y: 650 },   // Top-Left
-      { id: 'ENEMY_3', x: 3150, y: 3150 }, // Bottom-Right
-      { id: 'ENEMY_4', x: 1900, y: 650 }   // Top-Center
-    ];
+    for (const opp of opponentBases) {
+      const factionId = opp.factionId;
+      const isAlly = (opp.stance === 'ALLY');
+      const color = isAlly ? '#06b6d4' : (KINGDOMS[opp.civId]?.color || '#dc2626');
 
-    for (let i = 0; i < this.enemyCount; i++) {
-      const spawn = enemySpawns[i];
-      const faction = spawn.id;
+      // Fortress & Barracks
+      const oTC = new Building(opp.x, opp.y, 'TOWN_CENTER', factionId, true);
+      oTC.customColor = color;
+      oTC.isAlly = isAlly;
 
-      // Enemy Fortress & Barracks
-      const eTC = new Building(spawn.x, spawn.y, 'TOWN_CENTER', faction, true);
-      const eBarracks = new Building(spawn.x - 100, spawn.y + 60, 'BARRACKS', faction, true);
-      this.buildings.push(eTC);
-      this.buildings.push(eBarracks);
+      const oBarracks = new Building(opp.x - 90, opp.y + 50, 'BARRACKS', factionId, true);
+      oBarracks.customColor = color;
+      oBarracks.isAlly = isAlly;
 
-      // Enemy Starting Garrison
-      this.units.push(new Unit(spawn.x + 50, spawn.y + 70, 'SWORDSMAN', faction));
-      this.units.push(new Unit(spawn.x + 80, spawn.y + 85, 'SWORDSMAN', faction));
-      this.units.push(new Unit(spawn.x - 40, spawn.y + 90, 'ARCHER', faction));
-      this.units.push(new Unit(spawn.x + 20, spawn.y + 110, 'ARCHER', faction));
+      this.buildings.push(oTC);
+      this.buildings.push(oBarracks);
 
-      // Enemy territory resources
-      this.spawnForestGrove(spawn.x + 150, spawn.y - 60, 8, 200);
-      this.resources.push(new ResourceNode(spawn.x - 160, spawn.y - 60, 'GOLD', 600));
-      this.resources.push(new ResourceNode(spawn.x + 120, spawn.y + 140, 'FOOD', 300));
+      // Starting Units with Civ Bonuses
+      const vilC = (opp.civId === 'CHINESE') ? 5 : 3;
+      for (let i = 0; i < vilC; i++) {
+        const v = new Unit(opp.x - 45 + i * 24, opp.y + 55 + (i % 2) * 18, 'VILLAGER', factionId);
+        v.customColor = color;
+        v.isAlly = isAlly;
+        v.applyCivBonuses(opp.civId);
+        this.units.push(v);
+      }
+
+      const mil1 = new Unit(opp.x + 45, opp.y + 65, 'SWORDSMAN', factionId);
+      const mil2 = new Unit(opp.x + 75, opp.y + 80, 'ARCHER', factionId);
+      mil1.customColor = color;
+      mil2.customColor = color;
+      mil1.isAlly = isAlly;
+      mil2.isAlly = isAlly;
+      mil1.applyCivBonuses(opp.civId);
+      mil2.applyCivBonuses(opp.civId);
+      this.units.push(mil1);
+      this.units.push(mil2);
+
+      // Opponent territory resources
+      this.spawnForestGrove(opp.x + 130, opp.y - 60, 8, 220);
+      this.resources.push(new ResourceNode(opp.x - 140, opp.y - 60, 'GOLD', 650));
+      this.resources.push(new ResourceNode(opp.x + 110, opp.y + 120, 'FOOD', 300));
     }
 
     // ==========================================
-    // 3. EXPANSIVE CENTRAL RESOURCES (Wild forests & gold seams)
+    // 3. PROCEDURAL FRONTIER RESOURCES (Scaled to realm dimensions)
     // ==========================================
-    const neutralGroves = [
-      [1400, 1500], [1800, 1400], [2200, 1600],
-      [1300, 2300], [1900, 2400], [2500, 2200],
-      [1900, 1900], [900, 1900], [2900, 1900]
-    ];
-    for (const [gx, gy] of neutralGroves) {
-      this.spawnForestGrove(gx, gy, 8, 220);
+    const mapW = cols * 48;
+    const mapH = rows * 48;
+    const groveCount = (cols >= 75) ? 24 : ((cols >= 60) ? 16 : 10);
+    const goldCount = (cols >= 75) ? 14 : ((cols >= 60) ? 10 : 6);
+    const berryCount = (cols >= 75) ? 14 : ((cols >= 60) ? 10 : 6);
+
+    // Scatter Neutral Forests
+    for (let i = 0; i < groveCount; i++) {
+      const gx = 250 + Math.random() * (mapW - 500);
+      const gy = 250 + Math.random() * (mapH - 500);
+      if (this.map.isWalkable(gx, gy)) {
+        this.spawnForestGrove(gx, gy, 7 + Math.floor(Math.random() * 4), 220);
+      }
     }
 
-    // High yield gold outcrops
-    const neutralGold = [
-      [1600, 1600], [2200, 1400], [1600, 2200],
-      [2200, 2300], [1900, 1750], [1900, 2050]
-    ];
-    for (const [mx, my] of neutralGold) {
-      this.resources.push(new ResourceNode(mx, my, 'GOLD', 650));
+    // Scatter Neutral Gold Veins
+    for (let i = 0; i < goldCount; i++) {
+      const mx = 250 + Math.random() * (mapW - 500);
+      const my = 250 + Math.random() * (mapH - 500);
+      if (this.map.isWalkable(mx, my)) {
+        this.resources.push(new ResourceNode(mx, my, 'GOLD', 650));
+      }
     }
 
-    // Forage berry groves
-    const neutralBerries = [
-      [1700, 1850], [2100, 1950], [1400, 1900], [2400, 1900]
-    ];
-    for (const [bx, by] of neutralBerries) {
-      this.resources.push(new ResourceNode(bx, by, 'FOOD', 300));
+    // Scatter Neutral Berry Groves
+    for (let i = 0; i < berryCount; i++) {
+      const bx = 250 + Math.random() * (mapW - 500);
+      const by = 250 + Math.random() * (mapH - 500);
+      if (this.map.isWalkable(bx, by)) {
+        this.resources.push(new ResourceNode(bx, by, 'FOOD', 320));
+      }
     }
   }
 
@@ -801,13 +964,15 @@ export class Game {
     const dt = Math.min(0.1, (currentTime - this.lastTime) / 1000);
     this.lastTime = currentTime;
 
-    if (!this.hud.isPaused) {
+    if (this.hasStarted && !this.hud.isPaused) {
       this.elapsedSeconds += dt;
       this.stats.time = this.elapsedSeconds;
       this.update(dt);
     }
 
-    this.render();
+    if (this.hasStarted) {
+      this.render();
+    }
     requestAnimationFrame((t) => this.loop(t));
   }
 
@@ -877,7 +1042,7 @@ export class Game {
       }
 
       if (unit.isDead) {
-        if (unit.faction !== 'PLAYER') {
+        if (unit.faction !== 'PLAYER' && !unit.isAlly) {
           this.stats.vanquished++;
         }
         this.units.splice(i, 1);
@@ -901,15 +1066,15 @@ export class Game {
     // Update Population
     this.player.pop = this.units.filter(u => u.faction === 'PLAYER' && !u.isDead && !u.isDying).length;
 
-    // Update Fog of War
-    const friendlyUnits = this.units.filter(u => u.faction === 'PLAYER');
-    const friendlyBuildings = this.buildings.filter(b => b.faction === 'PLAYER');
+    // Update Fog of War (Player & Allies share vision)
+    const friendlyUnits = this.units.filter(u => this.isAllied(u, { faction: 'PLAYER' }));
+    const friendlyBuildings = this.buildings.filter(b => this.isAllied(b, { faction: 'PLAYER' }));
     this.fog.update(friendlyUnits, friendlyBuildings);
 
     // Check Victory & Defeat Conditions
-    if (!this.isGameOver) {
+    if (!this.isGameOver && this.hasStarted) {
       const enemyTCs = this.buildings.filter(
-        b => b.faction !== 'PLAYER' && b.buildingType === 'TOWN_CENTER' && !b.isDead
+        b => this.isHostile({ faction: 'PLAYER' }, b) && b.buildingType === 'TOWN_CENTER' && !b.isDead
       );
       const playerTC = this.buildings.find(
         b => b.faction === 'PLAYER' && b.buildingType === 'TOWN_CENTER' && !b.isDead
@@ -947,7 +1112,7 @@ export class Game {
       if (ent.faction === 'GAIA') {
         if (this.fog && !this.fog.isExplored(ent.x, ent.y)) continue;
         ent.render(this.ctx);
-      } else if (ent.faction !== 'PLAYER') {
+      } else if (!this.isAllied(ent, { faction: 'PLAYER' })) {
         if (ent instanceof Unit) {
           if (this.fog && !this.fog.isVisible(ent.x, ent.y)) continue;
           ent.render(this.ctx);
@@ -956,6 +1121,7 @@ export class Game {
           ent.render(this.ctx);
         }
       } else {
+        // Player and Allied entities
         ent.render(this.ctx);
       }
     }

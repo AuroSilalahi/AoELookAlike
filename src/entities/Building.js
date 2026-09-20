@@ -325,12 +325,13 @@ export class Building extends Entity {
         this.healTimer = 0;
 
         for (const unit of game.units) {
-          if (unit.faction === this.faction && !unit.isDead && !unit.isDying) {
+          const isFriendly = game.isAllied ? game.isAllied(this, unit) : (unit.faction === this.faction);
+          if (isFriendly && !unit.isDead && !unit.isDying) {
             if (unit.hp < unit.maxHp) {
               const d = Math.hypot(unit.x - this.x, unit.y - this.y);
               if (d <= this.healingRadius) {
                 // Check if player has food to sustain healing
-                if (this.faction === 'PLAYER') {
+                if (this.faction === 'PLAYER' || (game.isAllied && game.isAllied(this, { faction: 'PLAYER' }))) {
                   if (game.player.food >= 1) {
                     game.player.food -= 1;
                     unit.heal(8);
@@ -353,10 +354,11 @@ export class Building extends Entity {
       if (this.attackTimer > 0) {
         this.attackTimer -= dt;
       } else {
-        // Find all hostiles in range
+        // Find all hostiles in range using diplomacy
         const hostiles = [];
         for (const unit of game.units) {
-          if (unit.faction !== this.faction && !unit.isDead && !unit.isDying) {
+          const isEnemy = game.isHostile ? game.isHostile(this, unit) : (unit.faction !== this.faction);
+          if (isEnemy && !unit.isDead && !unit.isDying) {
             if (this.faction === 'PLAYER' && game.fog && !game.fog.isVisible(unit.x, unit.y)) {
               continue;
             }
@@ -421,22 +423,31 @@ export class Building extends Entity {
     let wallColor = '#4b5563';
     let roofColor = '#a93226';
 
-    if (this.faction === 'ENEMY_1') {
+    if (this.customColor) {
+      flagColor = this.customColor;
+      roofColor = this.customColor;
+    } else if (this.faction === 'PLAYER') {
+      flagColor = '#2563eb';
+      roofColor = '#1d4ed8';
+    } else if (this.isAlly) {
+      flagColor = '#06b6d4'; // Cyan for Allies
+      roofColor = '#0e7490';
+    } else if (this.faction === 'ENEMY_1' || this.faction.includes('JAPANESE')) {
       flagColor = '#dc2626';
       wallColor = '#524343';
       roofColor = '#991b1b';
-    } else if (this.faction === 'ENEMY_2') {
+    } else if (this.faction === 'ENEMY_2' || this.faction.includes('KOREAN')) {
       flagColor = '#9333ea';
       wallColor = '#483d52';
       roofColor = '#7e22ce';
-    } else if (this.faction === 'ENEMY_3') {
+    } else if (this.faction === 'ENEMY_3' || this.faction.includes('CHINESE')) {
       flagColor = '#ea580c';
       wallColor = '#52453d';
       roofColor = '#c2410c';
-    } else if (this.faction === 'ENEMY_4') {
-      flagColor = '#0d9488';
+    } else if (this.faction === 'ENEMY_4' || this.faction.includes('INDIAN')) {
+      flagColor = '#16a34a';
       wallColor = '#3d524f';
-      roofColor = '#0f766e';
+      roofColor = '#15803d';
     }
 
     // Ground Shadow
