@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Empires of the Web - Real-Time Strategy</title>
+  <meta name="description" content="A medieval web-based Real-Time Strategy game with Fog of War, base building, tech upgrades, tactical combat, and siege warfare." />
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700;900&family=Outfit:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="./style.css" />
+</head>
+<body>
+  <div id="game-container">
+    <!-- Main Game Canvas -->
+    <canvas id="game-canvas"></canvas>
+
+    <!-- Top HUD: Resources, Population & Actions -->
+    <header id="top-hud">
+      <div class="faction-banner">
+        <span class="shield-icon">🛡️</span>
+        <span class="civ-name">Kingdom of Solaria</span>
+      </div>
+
+      <div class="resource-bar">
+        <div class="resource-item" id="res-food" title="Food - Needed to train villagers and troops">
+          <span class="res-icon">🌾</span>
+          <span class="res-label">Food:</span>
+          <span class="res-value" id="val-food">250</span>
+        </div>
+        <div class="resource-item" id="res-wood" title="Wood - Needed to construct buildings">
+          <span class="res-icon">🪵</span>
+          <span class="res-label">Wood:</span>
+          <span class="res-value" id="val-wood">200</span>
+        </div>
+        <div class="resource-item" id="res-gold" title="Gold - Military troops & tech research">
+          <span class="res-icon">🪙</span>
+          <span class="res-label">Gold:</span>
+          <span class="res-value" id="val-gold">120</span>
+        </div>
+        <div class="resource-item" id="res-pop" title="Population - Build houses to expand">
+          <span class="res-icon">👥</span>
+          <span class="res-label">Pop:</span>
+          <span class="res-value" id="val-pop">5 / 10</span>
+        </div>
+      </div>
+
+      <div class="time-and-controls">
+        <span class="game-clock" id="game-timer">00:00</span>
+        <button id="btn-idle-vil" class="hud-btn-small hud-btn-alert" title="Cycle Idle Villagers (Hotkey: .)">👨‍🌾 Idle: <span id="val-idle-count">0</span></button>
+        <button id="btn-sound-toggle" class="hud-btn-small" title="Toggle Sound FX">🔊 Sound</button>
+        <button id="btn-music-toggle" class="hud-btn-small" title="Toggle Medieval Music">🎵 Music</button>
+        <button id="btn-menu-toggle" class="hud-btn-small" title="Game Settings & Pause (Esc)">⚙️ Menu</button>
+        <button id="btn-controls-help" class="hud-btn-small" title="View Controls & Shortcuts">❓ Help</button>
+      </div>
+    </header>
+
+    <!-- Objective / Mission Tracker -->
+    <div id="quest-tracker" class="quest-tracker">
+      <div class="quest-badge">📜 MISSION</div>
+      <div class="quest-text" id="quest-text">Build a Barracks, expand with Houses, and train troops to defend the realm!</div>
+    </div>
+
+    <!-- Raid Alert Banner -->
+    <div id="alert-banner" class="alert-banner hidden">
+      <span class="alert-icon">⚠️</span>
+      <span id="alert-text">ENEMY RAID DETECTED!</span>
+    </div>
+
+    <!-- Bottom HUD: Unit Selection & Command Center -->
+    <footer id="bottom-hud">
+      <!-- Minimap Container -->
+      <div class="minimap-panel">
+        <canvas id="minimap-canvas" width="160" height="160"></canvas>
+        <div class="minimap-label">MAP RADAR</div>
+      </div>
+
+      <!-- Center: Selection Details Card -->
+      <div class="selection-panel" id="selection-card">
+        <div class="empty-selection-msg">No unit or building selected</div>
+        <div class="unit-details-content" style="display: none;">
+          <div class="unit-avatar" id="unit-avatar">⚔️</div>
+          <div class="unit-meta">
+            <h3 id="unit-name">Swordsman</h3>
+            <div class="hp-bar-container">
+              <div class="hp-bar-fill" id="unit-hp-fill" style="width: 100%;"></div>
+            </div>
+            <div class="hp-text" id="unit-hp-text">HP: 100 / 100</div>
+            <div class="unit-stats-grid" id="unit-stats-grid">
+              <span>Attack: <strong id="stat-atk">16</strong></span>
+              <span>Speed: <strong id="stat-spd">2.2</strong></span>
+              <span>State: <strong id="stat-state">Ready</strong></span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Right: Action & Command Card -->
+      <div class="commands-panel" id="commands-panel">
+        <div class="panel-header">COMMANDS & RESEARCH</div>
+        <div class="action-grid" id="action-grid"></div>
+      </div>
+    </footer>
+
+    <!-- Pause & Settings Modal -->
+    <div id="pause-modal" class="modal-overlay hidden">
+      <div class="modal-card">
+        <div class="modal-header">
+          <h2>⚙️ Game Settings & Pause</h2>
+          <button id="btn-close-pause" class="close-btn">✕</button>
+        </div>
+        <div class="modal-body">
+          <div class="settings-row">
+            <span class="settings-label">Enemy AI Difficulty:</span>
+            <select id="select-difficulty" class="settings-select">
+              <option value="EASY">Easy (Scattered raids, no towers)</option>
+              <option value="NORMAL" selected>Normal (Tactical forces & tower defense)</option>
+              <option value="HARD">Hard (Heavy Cavalry & rapid waves)</option>
+            </select>
+          </div>
+          <div class="settings-row">
+            <span class="settings-label">Fog of War:</span>
+            <button id="btn-toggle-fog" class="hud-btn-small">👁️ Enabled</button>
+          </div>
+          <div class="settings-row">
+            <span class="settings-label">Ambient Soundtrack:</span>
+            <button id="btn-settings-music" class="hud-btn-small">🎵 Playing</button>
+          </div>
+          <div class="settings-row">
+            <span class="settings-label">Sound Effects:</span>
+            <button id="btn-settings-sound" class="hud-btn-small">🔊 On</button>
+          </div>
+        </div>
+        <div class="modal-footer" style="display: flex; justify-content: space-between;">
+          <button id="btn-restart-game" class="hud-btn-small" style="background: #7f1d1d; border-color: #ef4444; color: #fecaca;">🔄 Restart Match</button>
+          <button id="btn-resume-game" class="btn-primary">Resume Game</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Game Over (Victory / Defeat) Modal -->
+    <div id="game-over-modal" class="modal-overlay hidden">
+      <div class="modal-card game-over-card" id="game-over-card">
+        <div class="game-over-header" id="game-over-header">
+          <h1 id="game-over-title">🏆 VICTORY!</h1>
+          <p id="game-over-subtitle">The enemy stronghold has been razed!</p>
+        </div>
+        <div class="game-over-stats">
+          <div class="stat-box">
+            <span class="stat-num" id="stat-time">00:00</span>
+            <span class="stat-lbl">Time Elapsed</span>
+          </div>
+          <div class="stat-box">
+            <span class="stat-num" id="stat-trained">0</span>
+            <span class="stat-lbl">Troops Trained</span>
+          </div>
+          <div class="stat-box">
+            <span class="stat-num" id="stat-vanquished">0</span>
+            <span class="stat-lbl">Enemies Slain</span>
+          </div>
+        </div>
+        <div class="modal-footer" style="text-align: center; justify-content: center; display: flex;">
+          <button id="btn-play-again" class="btn-primary" style="font-size: 1.05rem; padding: 10px 30px;">⚔️ Play Again</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Controls Modal / Help Overlay -->
+    <div id="controls-modal" class="modal-overlay hidden">
+      <div class="modal-card">
+        <div class="modal-header">
+          <h2>⚔️ Game Controls & Shortcuts</h2>
+          <button id="btn-close-modal" class="close-btn">✕</button>
+        </div>
+        <div class="modal-body">
+          <div class="control-row">
+            <span class="ctrl-key">W A S D / Arrows</span>
+            <span class="ctrl-desc">Pan camera across the realm</span>
+          </div>
+          <div class="control-row">
+            <span class="ctrl-key">Mouse Wheel</span>
+            <span class="ctrl-desc">Zoom camera in / out</span>
+          </div>
+          <div class="control-row">
+            <span class="ctrl-key">Left-Click</span>
+            <span class="ctrl-desc">Select unit, building, or resource</span>
+          </div>
+          <div class="control-row">
+            <span class="ctrl-key">Left-Click & Drag</span>
+            <span class="ctrl-desc">Box-select multiple troops</span>
+          </div>
+          <div class="control-row">
+            <span class="ctrl-key">Right-Click Ground</span>
+            <span class="ctrl-desc">Move order / Set building rally point</span>
+          </div>
+          <div class="control-row">
+            <span class="ctrl-key">Right-Click Target</span>
+            <span class="ctrl-desc">Gather resource / Build structure / Attack hostile</span>
+          </div>
+          <div class="control-row">
+            <span class="ctrl-key">Ctrl + 1 - 9</span>
+            <span class="ctrl-desc">Assign selected units to Control Group</span>
+          </div>
+          <div class="control-row">
+            <span class="ctrl-key">1 - 9 (Double-tap)</span>
+            <span class="ctrl-desc">Select Control Group (Double tap to center camera)</span>
+          </div>
+          <div class="control-row">
+            <span class="ctrl-key">. (Period)</span>
+            <span class="ctrl-desc">Select & center on next Idle Villager</span>
+          </div>
+          <div class="control-row">
+            <span class="ctrl-key">H</span>
+            <span class="ctrl-desc">Jump camera to Town Center</span>
+          </div>
+          <div class="control-row">
+            <span class="ctrl-key">Spacebar</span>
+            <span class="ctrl-desc">Jump camera to latest alert / raid position</span>
+          </div>
+          <div class="control-row">
+            <span class="ctrl-key">Escape</span>
+            <span class="ctrl-desc">Pause Menu / Cancel placement</span>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button id="btn-modal-start" class="btn-primary">Return to Battlefield</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="./main.js"></script>
+</body>
+</html>
