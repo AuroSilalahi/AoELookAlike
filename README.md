@@ -1,56 +1,53 @@
 # ⚔️ Empires of the Web (AoE Look-Alike RTS)
 
-A medieval browser-based Real-Time Strategy (RTS) game built with Vanilla JavaScript, HTML5 Canvas, Web Audio API, and Vite. Inspired by classic strategy games like *Age of Empires II*, featuring real-time resource gathering, base building, tech tree progression, Fog of War, tactical combat, and adaptive AI invasions.
+A medieval browser-based Real-Time Strategy (RTS) game built with Vanilla JavaScript, HTML5 Canvas, Web Audio API, and Vite. Inspired by classic strategy games like *Age of Empires II*, featuring real-time resource gathering, base building, tech tree progression, Fog of War, tactical combat, and multi-enemy warfare across 80x80 maps.
 
 ---
 
-## 🌟 Features
+## 🌟 What's New in this Expansion
 
-### 👁️ Dynamic Fog of War
-- **3-Stage Visibility**: `Unexplored` (shrouded black), `Explored` (dimmed terrain & structures), and `Visible` (real-time field-of-view).
-- Hostile troops and raids stay hidden under the fog until scouted by your units or watch towers.
-- Real-time radar minimap shading matching your explored map.
+### 🌸 4 Asian Kingdoms (Civilizations)
+Choose your kingdom on match launch, each with distinct historical traits and aesthetics:
+- **🌸 Japanese Shogunate**: *Bushido Discipline* (+15% Swordsman & Knight attack damage, faster strike rate).
+- **🏯 Korean Joseon**: *Divine Artillery* (Fortress fires +2 extra arrows, Towers & Fortress have +25% range).
+- **🐉 Chinese Dynasty**: *Imperial Dynasty* (+3 starting villagers, -20% building wood cost, rapid research).
+- **🐘 Indian Maurya**: *Armored Cavalry* (+30% Knight cavalry HP, farms and gold mines provide bonus yield).
 
-### 🏰 Base Building & Sustainable Economy
-- **🏰 Town Center**: Base command hub, resource dropoff, and villager training facility.
-- **🏠 House**: Increases population limit (+5 per house).
-- **🛡️ Barracks**: Military training facility for Swordsmen, Archers, and Knights.
-- **🗼 Watch Tower**: Defensive fortification that automatically fires arrows at enemy invaders within range.
-- **⚒️ Blacksmith**: Military workshop for weapon, armor, and economy tech research.
-- **🌾 Farm**: Sustainable crop field with renewable food reserves so your economy thrives after wild berry bushes run out.
-- **🚩 Building Rally Points**: Right-click the ground while selecting a Town Center or Barracks to set a rally point flag for newly spawned units.
+### 🏰 Fortress Bastion & Healing Sanctuary
+- **Multi-Arrow Volleys**: Town Center Fortresses automatically fire **volleys of arrows** (base: 3 arrows simultaneously) at multiple hostiles in range.
+- **Sanctuary Healing**: Any wounded soldier stationed around your Fortress is healed over time (+8 HP/sec) by consuming a small amount of Food (1 Food per 8 HP) from your stockpile.
+- **Blacksmith Ballistics**: Upgradeable arrow counts (*Arrow Slits* adds +2 arrows; *Ballistics* increases range & projectile velocity).
 
-### 🏇 Rock-Paper-Scissors Combat Triangle
-- **👨‍🌾 Villager**: Gathers Wood, Food, and Gold; constructs buildings and repairs.
-- **⚔️ Swordsman**: Durable frontline infantry that counters heavy cavalry.
-- **🏹 Archer**: Ranged scout that kites slow melee troops.
-- **🏇 Knight**: High-speed mounted cavalry dealing **+50% bonus damage** against archers to break ranged formations.
+### 🗺️ 3 Expansive 80x80 Maps (3840 x 3840 px)
+- **🌊 River Valley**: Divided by a winding central river with **4-tile wide stone bridges** and shallows that prevent army congestion.
+- **⛰️ Mountain Pass**: Rugged stone plateaus, choke points, defensible heights, and rich mountain gold seams.
+- **🏜️ Desert Oasis**: Vast golden dunes with fertile palm oases, wide flanking terrain, and multi-front warfare.
 
-### 🔬 Tech Tree & Upgrades
-Research upgrades at the Blacksmith to empower your kingdom:
-- **🗡️ Forged Steel**: +3 Attack damage to Swordsmen and Knights.
-- **🛡️ Scale Armor**: +25 Max HP to all combat troops.
-- **🎯 Bodkin Arrows**: +35 Attack range and +2 Damage to Archers.
-- **🛒 Wheelbarrow**: +5 Villager carrying capacity and +15% movement speed.
+### ⚔️ Multi-Enemy Grand Wars (Up to 4 Rival Kingdoms)
+- Play in **1 vs 1, 1 vs 2, 1 vs 3, or 1 vs 4 Grand Wars**!
+- Rival Kingdoms (Crimson Horde, Amethyst Empire, Solar Khanate, Verdant Sultanate) each build bases, towers, and mobilize coordinated raids across stone bridges.
 
-### 🎶 Procedural Medieval Audio
-- **Ambient Soundtrack**: Procedurally generated pentatonic lute and harp chord progressions during peace time, transitioning to war drums during combat.
-- **Sound Effects**: Arrow volleys, knight lance impacts, sword clashing, wood chopping, pickaxe mining, anvil clinking, and victory fanfares synthesized with the **Web Audio API** (zero external audio file downloads needed).
+### 🌾 Abundant & Regrowing Resources
+- 20+ dense forest groves (220 wood/tree) with slow sapling regrowth.
+- Deep gold mines (650 gold) and berry foraging bushes across the realm.
+- Renewable crop fields (**Farms**) with 400 food reserves.
 
-### 🤖 Adaptive Enemy AI & Difficulty
-- **3 Difficulty Settings**: `Easy`, `Normal`, and `Hard`.
-- Enemy builds defensive Watch Towers, trains mixed forces, and coordinates tactical raids across river shallows targeting your economy and fortifications.
+### 🖥️ Viewable & Spacious UI
+- Deep, unclipped command and research panel (225px HUD) with distinct icons, clear unit names, and clean cost badges (`100🪵 20🪙`).
+- Match setup modal for selecting Kingdom, Map, Enemy Count, and Difficulty.
 
-### ⌨️ RTS Controls & Shortcuts
+---
+
+## ⌨️ RTS Controls & Shortcuts
 - **W A S D / Arrow Keys**: Pan camera across the realm.
-- **Mouse Wheel**: Smooth zoom in / out.
+- **Mouse Wheel**: Smooth zoom in / out (supports 0.35x tactical zoom).
 - **Left-Click**: Select individual unit, building, or resource node.
 - **Left-Click & Drag**: Box-select multiple troops.
 - **Right-Click**: Issue move orders, attack enemies, gather resources, or set building rally points.
 - **Ctrl + 1 - 9**: Assign selected troops to a numbered Control Group.
 - **1 - 9**: Select Control Group (double-tap to snap camera to group).
 - **. (Period)**: Cycle and focus on the next Idle Villager.
-- **H**: Jump camera to Town Center.
+- **H**: Jump camera to Town Center Fortress.
 - **Spacebar**: Snap camera to the location of the latest raid warning.
 - **Escape**: Pause / Settings menu (or cancel building placement).
 
@@ -84,14 +81,6 @@ Open your browser at `http://localhost:5173/` to play!
 npm run build
 npm run preview
 ```
-
----
-
-## 🛠️ Tech Stack
-- **Engine / Core**: Vanilla JavaScript (ES Modules), HTML5 Canvas
-- **Styling**: Vanilla CSS (Cinzel & Outfit typography, glassmorphism UI)
-- **Audio**: Web Audio API (Zero audio assets required)
-- **Bundler**: Vite
 
 ---
 

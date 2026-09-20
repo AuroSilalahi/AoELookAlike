@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Empires of the Web - Real-Time Strategy</title>
-  <meta name="description" content="A medieval web-based Real-Time Strategy game with Fog of War, base building, tech upgrades, tactical combat, and siege warfare." />
+  <meta name="description" content="A medieval browser-based Real-Time Strategy game with Asian Kingdoms, 80x80 maps, multi-enemy warfare, and fortress bastions." />
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700;900&family=Outfit:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -17,26 +17,26 @@
 
     <!-- Top HUD: Resources, Population & Actions -->
     <header id="top-hud">
-      <div class="faction-banner">
-        <span class="shield-icon">🛡️</span>
-        <span class="civ-name">Kingdom of Solaria</span>
+      <div class="faction-banner" id="civ-banner">
+        <span class="shield-icon" id="civ-icon">🌸</span>
+        <span class="civ-name" id="civ-name">Japanese Shogunate</span>
       </div>
 
       <div class="resource-bar">
-        <div class="resource-item" id="res-food" title="Food - Needed to train villagers and troops">
+        <div class="resource-item" id="res-food" title="Food - Needed to train villagers, troops, and heal soldiers at the Fortress">
           <span class="res-icon">🌾</span>
           <span class="res-label">Food:</span>
-          <span class="res-value" id="val-food">250</span>
+          <span class="res-value" id="val-food">300</span>
         </div>
-        <div class="resource-item" id="res-wood" title="Wood - Needed to construct buildings">
+        <div class="resource-item" id="res-wood" title="Wood - Needed to construct buildings & farms">
           <span class="res-icon">🪵</span>
           <span class="res-label">Wood:</span>
-          <span class="res-value" id="val-wood">200</span>
+          <span class="res-value" id="val-wood">250</span>
         </div>
         <div class="resource-item" id="res-gold" title="Gold - Military troops & tech research">
           <span class="res-icon">🪙</span>
           <span class="res-label">Gold:</span>
-          <span class="res-value" id="val-gold">120</span>
+          <span class="res-value" id="val-gold">150</span>
         </div>
         <div class="resource-item" id="res-pop" title="Population - Build houses to expand">
           <span class="res-icon">👥</span>
@@ -51,6 +51,7 @@
         <button id="btn-sound-toggle" class="hud-btn-small" title="Toggle Sound FX">🔊 Sound</button>
         <button id="btn-music-toggle" class="hud-btn-small" title="Toggle Medieval Music">🎵 Music</button>
         <button id="btn-menu-toggle" class="hud-btn-small" title="Game Settings & Pause (Esc)">⚙️ Menu</button>
+        <button id="btn-new-match" class="hud-btn-small" title="Match Setup (Kingdom & Map Selection)">⚔️ New Match</button>
         <button id="btn-controls-help" class="hud-btn-small" title="View Controls & Shortcuts">❓ Help</button>
       </div>
     </header>
@@ -58,7 +59,7 @@
     <!-- Objective / Mission Tracker -->
     <div id="quest-tracker" class="quest-tracker">
       <div class="quest-badge">📜 MISSION</div>
-      <div class="quest-text" id="quest-text">Build a Barracks, expand with Houses, and train troops to defend the realm!</div>
+      <div class="quest-text" id="quest-text">Build a Barracks, expand your realm, and defend against rival kingdoms!</div>
     </div>
 
     <!-- Raid Alert Banner -->
@@ -71,8 +72,8 @@
     <footer id="bottom-hud">
       <!-- Minimap Container -->
       <div class="minimap-panel">
-        <canvas id="minimap-canvas" width="160" height="160"></canvas>
-        <div class="minimap-label">MAP RADAR</div>
+        <canvas id="minimap-canvas" width="180" height="180"></canvas>
+        <div class="minimap-label">RADAR MAP</div>
       </div>
 
       <!-- Center: Selection Details Card -->
@@ -102,6 +103,105 @@
       </div>
     </footer>
 
+    <!-- Match Setup / Kingdom & Map Selection Modal -->
+    <div id="setup-modal" class="modal-overlay hidden">
+      <div class="modal-card setup-modal-card">
+        <div class="modal-header">
+          <h2>⚔️ Match Setup: Kingdom, Map & Enemies</h2>
+          <button id="btn-close-setup" class="close-btn">✕</button>
+        </div>
+        <div class="modal-body setup-modal-body">
+          <!-- 1. Kingdom Choice -->
+          <div class="setup-section-title">1. CHOOSE YOUR KINGDOM</div>
+          <div class="civ-grid">
+            <div class="civ-card active" data-civ="JAPANESE">
+              <div class="civ-card-header">
+                <span class="civ-crest">🌸</span>
+                <h4>Japanese Shogunate</h4>
+              </div>
+              <div class="civ-trait-title">Trait: Bushido Discipline</div>
+              <p class="civ-desc">+15% Swordsman & Knight attack damage, faster strike rate.</p>
+            </div>
+            <div class="civ-card" data-civ="KOREAN">
+              <div class="civ-card-header">
+                <span class="civ-crest">🏯</span>
+                <h4>Korean Joseon</h4>
+              </div>
+              <div class="civ-trait-title">Trait: Divine Artillery</div>
+              <p class="civ-desc">Fortress fires +2 extra arrows. Towers & Fortress have +25% range.</p>
+            </div>
+            <div class="civ-card" data-civ="CHINESE">
+              <div class="civ-card-header">
+                <span class="civ-crest">🐉</span>
+                <h4>Chinese Empire</h4>
+              </div>
+              <div class="civ-trait-title">Trait: Imperial Dynasty</div>
+              <p class="civ-desc">+3 Starting Villagers, -20% building wood cost, faster research.</p>
+            </div>
+            <div class="civ-card" data-civ="INDIAN">
+              <div class="civ-card-header">
+                <span class="civ-crest">🐘</span>
+                <h4>Indian Maurya</h4>
+              </div>
+              <div class="civ-trait-title">Trait: Armored Cavalry</div>
+              <p class="civ-desc">+30% Knight cavalry HP, farms provide +30% more food reserve.</p>
+            </div>
+          </div>
+
+          <!-- 2. Map Selection -->
+          <div class="setup-section-title" style="margin-top: 14px;">2. CHOOSE BATTLEFIELD (80x80 EXPANDED REALM)</div>
+          <div class="map-grid">
+            <div class="map-card active" data-map="RIVER_VALLEY">
+              <div class="map-icon">🌊</div>
+              <div class="map-info">
+                <h4>River Valley</h4>
+                <p>Divided by a winding central river with 4-tile wide stone bridges and shallows.</p>
+              </div>
+            </div>
+            <div class="map-card" data-map="MOUNTAIN_PASS">
+              <div class="map-icon">⛰️</div>
+              <div class="map-info">
+                <h4>Mountain Pass</h4>
+                <p>Rocky crags, plateau fortifications, choke points, and rich veins of gold.</p>
+              </div>
+            </div>
+            <div class="map-card" data-map="DESERT_OASIS">
+              <div class="map-icon">🏜️</div>
+              <div class="map-info">
+                <h4>Desert Oasis</h4>
+                <p>Expansive dunes with fertile palm oases, wide flanks, and multi-front warfare.</p>
+              </div>
+            </div>
+          </div>
+
+          <!-- 3. Rivals Count & AI Difficulty -->
+          <div class="setup-options-row" style="margin-top: 14px;">
+            <div class="setup-option-item">
+              <label>Number of Rival Kingdoms:</label>
+              <select id="select-enemy-count" class="settings-select">
+                <option value="1">1 Rival Kingdom (1 vs 1)</option>
+                <option value="2">2 Rival Kingdoms (1 vs 2)</option>
+                <option value="3">3 Rival Kingdoms (1 vs 3)</option>
+                <option value="4" selected>4 Rival Kingdoms (1 vs 4 Grand War)</option>
+              </select>
+            </div>
+            <div class="setup-option-item">
+              <label>AI Difficulty:</label>
+              <select id="setup-difficulty" class="settings-select">
+                <option value="EASY">Easy (Scattered raids)</option>
+                <option value="NORMAL" selected>Normal (Tactical forces & towers)</option>
+                <option value="HARD">Hard (Heavy Cavalry & fast waves)</option>
+              </select>
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer" style="display: flex; justify-content: space-between; align-items: center;">
+          <span style="font-size: 0.85rem; color: var(--text-muted);">Selected: <strong id="setup-summary-text" style="color: var(--gold-light);">Japanese • River Valley • 4 Enemies</strong></span>
+          <button id="btn-start-custom-match" class="btn-primary" style="padding: 10px 24px; font-size: 1rem;">⚔️ Launch Campaign</button>
+        </div>
+      </div>
+    </div>
+
     <!-- Pause & Settings Modal -->
     <div id="pause-modal" class="modal-overlay hidden">
       <div class="modal-card">
@@ -113,9 +213,9 @@
           <div class="settings-row">
             <span class="settings-label">Enemy AI Difficulty:</span>
             <select id="select-difficulty" class="settings-select">
-              <option value="EASY">Easy (Scattered raids, no towers)</option>
-              <option value="NORMAL" selected>Normal (Tactical forces & tower defense)</option>
-              <option value="HARD">Hard (Heavy Cavalry & rapid waves)</option>
+              <option value="EASY">Easy</option>
+              <option value="NORMAL" selected>Normal</option>
+              <option value="HARD">Hard</option>
             </select>
           </div>
           <div class="settings-row">
@@ -132,7 +232,7 @@
           </div>
         </div>
         <div class="modal-footer" style="display: flex; justify-content: space-between;">
-          <button id="btn-restart-game" class="hud-btn-small" style="background: #7f1d1d; border-color: #ef4444; color: #fecaca;">🔄 Restart Match</button>
+          <button id="btn-restart-game" class="hud-btn-small" style="background: #7f1d1d; border-color: #ef4444; color: #fecaca;">🔄 Restart Current Match</button>
           <button id="btn-resume-game" class="btn-primary">Resume Game</button>
         </div>
       </div>
@@ -143,7 +243,7 @@
       <div class="modal-card game-over-card" id="game-over-card">
         <div class="game-over-header" id="game-over-header">
           <h1 id="game-over-title">🏆 VICTORY!</h1>
-          <p id="game-over-subtitle">The enemy stronghold has been razed!</p>
+          <p id="game-over-subtitle">All rival strongholds have been razed!</p>
         </div>
         <div class="game-over-stats">
           <div class="stat-box">
@@ -159,8 +259,9 @@
             <span class="stat-lbl">Enemies Slain</span>
           </div>
         </div>
-        <div class="modal-footer" style="text-align: center; justify-content: center; display: flex;">
-          <button id="btn-play-again" class="btn-primary" style="font-size: 1.05rem; padding: 10px 30px;">⚔️ Play Again</button>
+        <div class="modal-footer" style="text-align: center; justify-content: center; display: flex; gap: 12px;">
+          <button id="btn-play-again" class="btn-primary" style="font-size: 1.05rem; padding: 10px 24px;">⚔️ Play Again</button>
+          <button id="btn-game-over-setup" class="hud-btn-small" style="font-size: 1rem; padding: 10px 20px;">🗺️ Change Map / Civ</button>
         </div>
       </div>
     </div>
@@ -195,11 +296,15 @@
           </div>
           <div class="control-row">
             <span class="ctrl-key">Right-Click Target</span>
-            <span class="ctrl-desc">Gather resource / Build structure / Attack hostile</span>
+            <span class="ctrl-desc">Gather resource / Harvest farm / Build / Attack</span>
+          </div>
+          <div class="control-row">
+            <span class="ctrl-key">Fortress Healing</span>
+            <span class="ctrl-desc">Injured soldiers near Fortress heal (+8 HP/s) using Food</span>
           </div>
           <div class="control-row">
             <span class="ctrl-key">Ctrl + 1 - 9</span>
-            <span class="ctrl-desc">Assign selected units to Control Group</span>
+            <span class="ctrl-desc">Assign selected troops to Control Group</span>
           </div>
           <div class="control-row">
             <span class="ctrl-key">1 - 9 (Double-tap)</span>
@@ -211,7 +316,7 @@
           </div>
           <div class="control-row">
             <span class="ctrl-key">H</span>
-            <span class="ctrl-desc">Jump camera to Town Center</span>
+            <span class="ctrl-desc">Jump camera to Town Center Fortress</span>
           </div>
           <div class="control-row">
             <span class="ctrl-key">Spacebar</span>

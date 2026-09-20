@@ -7,7 +7,7 @@ export const UNIT_TYPES = {
     hp: 80,
     speed: 120,
     radius: 12,
-    attack: 5,
+    attack: 6,
     range: 22,
     cooldown: 1.4,
     avatar: '👨‍🌾',
@@ -79,7 +79,8 @@ export class Unit extends Entity {
     // Combat & Aggro
     this.targetEnemy = null;
     this.attackCooldownTimer = 0;
-    this.sightRadius = type === 'ARCHER' ? 220 : type === 'KNIGHT' ? 200 : 185;
+    this.attackPathTimer = 0;
+    this.sightRadius = type === 'ARCHER' ? 230 : type === 'KNIGHT' ? 210 : 190;
     this.isDying = false;
     this.deathFade = 1.0;
 
@@ -101,14 +102,40 @@ export class Unit extends Entity {
     this.dustTimer = 0;
   }
 
+  applyCivBonuses(civ) {
+    if (!civ) return;
+
+    if (civ === 'JAPANESE') {
+      // Bushido: Swordsman & Knights +15% Damage & +10% Speed
+      if (this.unitType === 'SWORDSMAN' || this.unitType === 'KNIGHT') {
+        this.baseAttack = Math.round(this.baseAttack * 1.15);
+        this.attackDamage = this.baseAttack;
+        this.baseSpeed = Math.round(this.baseSpeed * 1.1);
+        this.speed = this.baseSpeed;
+      }
+    } else if (civ === 'KOREAN') {
+      // Divine Artillery: Archers +25% Range
+      if (this.unitType === 'ARCHER') {
+        this.baseRange = Math.round(this.baseRange * 1.25);
+        this.attackRange = this.baseRange;
+        this.sightRadius += 30;
+      }
+    } else if (civ === 'INDIAN') {
+      // Armored Cavalry: Knights +30% HP
+      if (this.unitType === 'KNIGHT') {
+        this.maxHp = Math.round(this.maxHp * 1.3);
+        this.hp = this.maxHp;
+      }
+    } else if (civ === 'CHINESE') {
+      // Rapid gathering
+      if (this.unitType === 'VILLAGER') {
+        this.gatherInterval = 0.85;
+      }
+    }
+  }
+
   applyUpgrades(upgradesSet) {
     if (!upgradesSet) return;
-
-    // Reset to base
-    this.speed = this.baseSpeed;
-    this.attackDamage = this.baseAttack;
-    this.attackRange = this.baseRange;
-    this.maxCarry = this.baseCarry;
 
     // 1. Wheelbarrow (Villager speed & carry)
     if (this.unitType === 'VILLAGER' && upgradesSet.has('WHEELBARROW')) {
@@ -130,7 +157,7 @@ export class Unit extends Entity {
     // 4. Scale Armor (HP bonus)
     if (this.unitType !== 'VILLAGER' && upgradesSet.has('SCALE_ARMOR')) {
       const bonusHp = 25;
-      if (this.maxHp === UNIT_TYPES[this.unitType].hp) {
+      if (this.maxHp <= UNIT_TYPES[this.unitType].hp * 1.1) {
         this.maxHp += bonusHp;
         this.hp += bonusHp;
       }
@@ -168,6 +195,7 @@ export class Unit extends Entity {
     this.targetBuilding = null;
     this.waypoints = [];
     this.state = 'ATTACKING';
+    this.attackPathTimer = 0; // Force immediate path check
   }
 
   orderHarvest(resourceNode, dropoffBuilding) {
@@ -261,7 +289,7 @@ export class Unit extends Entity {
     }
 
     // ==========================================
-    // 1. COMBAT & AGGRO LOGIC
+    // 1. COMBAT & AGGRO LOGIC WITH INTELLIGENT BRIDGE PATHING
     // ==========================================
     if (this.state === 'IDLE' && game) {
       const nearestEnemy = this.findNearestHostile(game);
@@ -285,8 +313,40 @@ export class Unit extends Entity {
       const effectiveRange = this.radius + this.targetEnemy.radius + this.attackRange;
 
       if (dist > effectiveRange) {
-        this.stepTowards(this.targetEnemy.x, this.targetEnemy.y, dt, map, game);
+        // Pursuit across terrain: Check if we need A* pathfinding over bridges/water
+        this.attackPathTimer -= dt;
+
+        // Recompute intelligent path every 1.5s or if no path exists
+        if (this.attackPathTimer <= 0 && game && game.pathfinder) {
+          this.attackPathTimer = 1.5;
+          const obstacles = [...game.buildings];
+          const path = game.pathfinder.findPath(this.x, this.y, this.targetEnemy.x, this.targetEnemy.y, obstacles);
+          if (path && path.length > 0) {
+            this.waypoints = [...path];
+            const next = this.waypoints.shift();
+            this.targetX = next.x;
+            this.targetY = next.y;
+          }
+        }
+
+        // Move along waypoints if pathfinding across bridges
+        if (this.waypoints.length > 0 && this.targetX !== null && this.targetY !== null) {
+          const wDist = Math.hypot(this.targetX - this.x, this.targetY - this.y);
+          if (wDist <= 8) {
+            const next = this.waypoints.shift();
+            this.targetX = next.x;
+            this.targetY = next.y;
+          }
+          this.stepTowards(this.targetX, this.targetY, dt, map, game);
+        } else {
+          // Direct step if in close line-of-sight
+          this.stepTowards(this.targetEnemy.x, this.targetEnemy.y, dt, map, game);
+        }
       } else {
+        // In range -> Execute Attack!
+        this.waypoints = [];
+        this.targetX = null;
+        this.targetY = null;
         this.walkTimer = 0;
         this.angle = Math.atan2(this.targetEnemy.y - this.y, this.targetEnemy.x - this.x);
 
@@ -543,14 +603,12 @@ export class Unit extends Entity {
   }
 
   findNearestHostile(game) {
-    const hostileFaction = this.faction === 'PLAYER' ? 'ENEMY' : 'PLAYER';
     let nearest = null;
     let minDist = this.sightRadius;
 
-    // Check hostile units
+    // Check hostile units (any unit with a different faction)
     for (const u of game.units) {
-      if (u.faction === hostileFaction && !u.isDead && !u.isDying) {
-        // Respect Fog of War for Player units
+      if (u.faction !== this.faction && !u.isDead && !u.isDying) {
         if (this.faction === 'PLAYER' && game.fog && !game.fog.isVisible(u.x, u.y)) {
           continue;
         }
@@ -565,7 +623,7 @@ export class Unit extends Entity {
     // Check hostile buildings if no units nearby
     if (!nearest) {
       for (const b of game.buildings) {
-        if (b.faction === hostileFaction && !b.isDead) {
+        if (b.faction !== this.faction && !b.isDead) {
           if (this.faction === 'PLAYER' && game.fog && !game.fog.isVisible(b.x, b.y)) {
             continue;
           }
@@ -592,6 +650,7 @@ export class Unit extends Entity {
     const nextX = this.x + (dx / dist) * step;
     const nextY = this.y + (dy / dist) * step;
 
+    // Corner slide and collision resolution
     if (map.isWalkable(nextX, nextY)) {
       this.x = nextX;
       this.y = nextY;
@@ -599,18 +658,28 @@ export class Unit extends Entity {
       this.x = nextX;
     } else if (map.isWalkable(this.x, nextY)) {
       this.y = nextY;
+    } else {
+      // Diagonal nudge fallback so units never get glued to a corner
+      const nudge = step * 0.7;
+      if (map.isWalkable(this.x + nudge, this.y)) this.x += nudge;
+      else if (map.isWalkable(this.x - nudge, this.y)) this.x -= nudge;
+      else if (map.isWalkable(this.x, this.y + nudge)) this.y += nudge;
+      else if (map.isWalkable(this.x, this.y - nudge)) this.y -= nudge;
     }
 
     this.walkTimer += dt * (this.speed / 12);
 
     // Dust and water ripple juice
     this.dustTimer += dt;
-    if (this.dustTimer >= 0.2 && game && game.effects) {
+    if (this.dustTimer >= 0.22 && game && game.effects) {
       this.dustTimer = 0;
       const tile = map.getTile(Math.floor(this.x / map.tileSize), Math.floor(this.y / map.tileSize));
-      if (tile === 1) {
-        game.effects.addWaterRipple(this.x, this.y);
-      } else {
+      if (tile === 4) {
+        // Bridge footstep
+        game.effects.addDust(this.x, this.y);
+      } else if (tile === 1 || tile === 5) {
+        game.effects.addDust(this.x, this.y);
+      } else if (tile === 0) {
         game.effects.addDust(this.x, this.y);
       }
     }
@@ -658,9 +727,23 @@ export class Unit extends Entity {
     ctx.translate(0, -bob);
     ctx.rotate(this.angle);
 
-    const isPlayer = this.faction === 'PLAYER';
-    const primaryColor = isPlayer ? '#2563eb' : '#dc2626';
-    const secondaryColor = isPlayer ? '#1d4ed8' : '#b91c1c';
+    // Faction Colors
+    let primaryColor = '#2563eb';
+    let secondaryColor = '#1d4ed8';
+
+    if (this.faction === 'ENEMY_1') {
+      primaryColor = '#dc2626'; // Crimson Red
+      secondaryColor = '#991b1b';
+    } else if (this.faction === 'ENEMY_2') {
+      primaryColor = '#9333ea'; // Amethyst Purple
+      secondaryColor = '#6b21a8';
+    } else if (this.faction === 'ENEMY_3') {
+      primaryColor = '#ea580c'; // Solar Orange
+      secondaryColor = '#c2410c';
+    } else if (this.faction === 'ENEMY_4') {
+      primaryColor = '#0d9488'; // Verdant Teal
+      secondaryColor = '#0f766e';
+    }
 
     if (this.unitType === 'KNIGHT') {
       // HORSE MOUNT

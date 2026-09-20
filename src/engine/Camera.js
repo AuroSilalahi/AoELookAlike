@@ -7,7 +7,7 @@ export class Camera {
     this.x = mapWidth / 2;
     this.y = mapHeight / 2;
     this.zoom = 1.0;
-    this.minZoom = 0.5;
+    this.minZoom = 0.35;
     this.maxZoom = 2.0;
 
     this.panSpeed = 500; // pixels per second

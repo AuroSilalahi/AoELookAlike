@@ -9,7 +9,7 @@ import { Building, BUILDING_TYPES, UPGRADE_CONFIG } from './entities/Building.js
 import { ResourceNode } from './entities/ResourceNode.js';
 import { HUD } from './ui/HUD.js';
 import { SoundFX } from './audio/SoundFX.js';
-import { EnemyAI } from './ai/EnemyAI.js';
+import { EnemyAI, ENEMY_FACTIONS } from './ai/EnemyAI.js';
 
 export class Game {
   constructor() {
@@ -21,11 +21,16 @@ export class Game {
     this.enemyAI = new EnemyAI(this);
     this.effects = new Effects();
 
+    // Match Config
+    this.playerCiv = 'JAPANESE';
+    this.mapType = 'RIVER_VALLEY';
+    this.enemyCount = 4;
+
     // Player State & Tech
     this.player = {
-      food: 260,
-      wood: 220,
-      gold: 140,
+      food: 300,
+      wood: 250,
+      gold: 150,
       pop: 5,
       maxPop: 10
     };
@@ -39,11 +44,11 @@ export class Game {
     };
 
     this.isGameOver = false;
-    this.lastAlertPos = { x: 550, y: 500 };
+    this.lastAlertPos = { x: 650, y: 3150 };
 
-    // World & Systems
-    this.map = new TileMap(50, 50, 48);
-    this.fog = new FogOfWar(50, 50, 48);
+    // World & Systems (80x80 tiles = 3840 x 3840 px)
+    this.map = new TileMap(80, 80, 48, this.mapType);
+    this.fog = new FogOfWar(80, 80, 48);
     this.pathfinder = new Pathfinder(this.map);
     this.camera = new Camera(this.canvas, this.map.width, this.map.height);
     this.input = new Input(this.canvas, this.camera);
@@ -68,21 +73,15 @@ export class Game {
     this.lastTime = 0;
     this.elapsedSeconds = 0;
     this.idleVillagerIndex = 0;
+    this.resourceRegrowthTimer = 0;
 
     this.resizeCanvas();
     window.addEventListener('resize', () => this.resizeCanvas());
 
     this.setupInputHandlers();
-    this.spawnWorld();
 
-    this.camera.x = 550;
-    this.camera.y = 500;
-    this.camera.clamp();
-
-    // Initialize Fog of War
-    const friendlyUnits = this.units.filter(u => u.faction === 'PLAYER');
-    const friendlyBuildings = this.buildings.filter(b => b.faction === 'PLAYER');
-    this.fog.update(friendlyUnits, friendlyBuildings);
+    // Start default match
+    this.startNewMatch(this.playerCiv, this.mapType, this.enemyCount, 'NORMAL');
 
     requestAnimationFrame((t) => this.loop(t));
   }
@@ -92,69 +91,184 @@ export class Game {
     this.canvas.height = window.innerHeight;
   }
 
-  spawnWorld() {
-    // 1. Player Realm: Town Center
-    const playerTC = new Building(550, 500, 'TOWN_CENTER', 'PLAYER', true);
+  startNewMatch(civId = 'JAPANESE', mapType = 'RIVER_VALLEY', enemyCount = 4, difficulty = 'NORMAL') {
+    this.playerCiv = civId;
+    this.mapType = mapType;
+    this.enemyCount = Math.max(1, Math.min(4, enemyCount));
+    this.isGameOver = false;
+    this.elapsedSeconds = 0;
+    this.stats = { time: 0, trained: 5, vanquished: 0 };
+    this.playerUpgrades.clear();
+
+    // 1. Rebuild Map & World Systems
+    this.map.generateMap(mapType);
+    this.fog = new FogOfWar(80, 80, 48);
+    this.pathfinder = new Pathfinder(this.map);
+    this.camera = new Camera(this.canvas, this.map.width, this.map.height);
+    this.input.camera = this.camera;
+
+    // Reset collections
+    this.units = [];
+    this.buildings = [];
+    this.resources = [];
+    this.projectiles = [];
+    this.selectedEntities = [];
+    this.cancelPlacement();
+
+    // 2. Initialize Resources with Civ bonuses
+    this.player = {
+      food: civId === 'CHINESE' ? 320 : 300,
+      wood: civId === 'CHINESE' ? 280 : 250,
+      gold: 150,
+      pop: 5,
+      maxPop: 10
+    };
+
+    // 3. Initialize AI
+    this.enemyAI.setDifficulty(difficulty);
+    this.enemyAI.initFactions(this.enemyCount);
+
+    // 4. Spawn Player & Enemy Kingdoms
+    this.spawnKingdomsAndResources();
+
+    // 5. Update HUD Banner
+    this.hud.setCivilizationBanner(civId);
+    this.hud.showAlert(`⚔️ Campaign started as ${this.hud.civName.textContent} on ${mapType.replace('_', ' ')}!`);
+
+    // Focus Camera on Player Town Center
+    this.camera.x = 650;
+    this.camera.y = 3150;
+    this.camera.clamp();
+
+    // Initial Fog of War calculation
+    const friendlyUnits = this.units.filter(u => u.faction === 'PLAYER');
+    const friendlyBuildings = this.buildings.filter(b => b.faction === 'PLAYER');
+    this.fog.update(friendlyUnits, friendlyBuildings);
+  }
+
+  spawnKingdomsAndResources() {
+    // ==========================================
+    // 1. PLAYER BASE (Bottom-Left Sector: 650, 3150)
+    // ==========================================
+    const pX = 650;
+    const pY = 3150;
+    const playerTC = new Building(pX, pY, 'TOWN_CENTER', 'PLAYER', true);
     this.buildings.push(playerTC);
 
-    // Player Starting Troops: 3 Villagers & 2 Swordsmen
-    this.units.push(new Unit(470, 560, 'VILLAGER', 'PLAYER'));
-    this.units.push(new Unit(500, 590, 'VILLAGER', 'PLAYER'));
-    this.units.push(new Unit(460, 610, 'VILLAGER', 'PLAYER'));
+    // Starting Units (Chinese gets +3 starting villagers!)
+    const vilCount = this.playerCiv === 'CHINESE' ? 6 : 3;
+    for (let i = 0; i < vilCount; i++) {
+      const v = new Unit(pX - 60 + i * 26, pY + 70 + (i % 2) * 20, 'VILLAGER', 'PLAYER');
+      v.applyCivBonuses(this.playerCiv);
+      this.units.push(v);
+    }
+    const s1 = new Unit(pX + 60, pY + 80, 'SWORDSMAN', 'PLAYER');
+    const s2 = new Unit(pX + 90, pY + 95, 'SWORDSMAN', 'PLAYER');
+    s1.applyCivBonuses(this.playerCiv);
+    s2.applyCivBonuses(this.playerCiv);
+    this.units.push(s1);
+    this.units.push(s2);
 
-    this.units.push(new Unit(580, 580, 'SWORDSMAN', 'PLAYER'));
-    this.units.push(new Unit(610, 610, 'SWORDSMAN', 'PLAYER'));
+    // Surrounding Player Forests (Abundant 220 Wood trees!)
+    this.spawnForestGrove(pX - 180, pY - 80, 10, 220);
+    this.spawnForestGrove(pX - 80, pY - 180, 10, 220);
+    // Player Gold Mines (600 Gold each)
+    this.resources.push(new ResourceNode(pX + 180, pY - 80, 'GOLD', 600));
+    this.resources.push(new ResourceNode(pX + 230, pY - 50, 'GOLD', 550));
+    // Berry Bushes
+    this.resources.push(new ResourceNode(pX + 160, pY + 120, 'FOOD', 300));
+    this.resources.push(new ResourceNode(pX + 200, pY + 150, 'FOOD', 300));
 
-    // 2. Enemy Realm: Town Center, Barracks & Garrison
-    const enemyTC = new Building(1850, 1820, 'TOWN_CENTER', 'ENEMY', true);
-    const enemyBarracks = new Building(1720, 1740, 'BARRACKS', 'ENEMY', true);
-    this.buildings.push(enemyTC);
-    this.buildings.push(enemyBarracks);
-
-    // Enemy Starting Garrison
-    this.units.push(new Unit(1780, 1760, 'SWORDSMAN', 'ENEMY'));
-    this.units.push(new Unit(1820, 1720, 'SWORDSMAN', 'ENEMY'));
-    this.units.push(new Unit(1730, 1800, 'ARCHER', 'ENEMY'));
-    this.units.push(new Unit(1790, 1850, 'ARCHER', 'ENEMY'));
-
-    // 3. Resource Nodes near Player Territory
-    const treeCoords = [
-      [360, 440], [400, 420], [440, 400], [480, 390],
-      [330, 500], [360, 530], [340, 570], [380, 590]
+    // ==========================================
+    // 2. ENEMY BASES (Up to 4 Factions in other quadrants)
+    // ==========================================
+    const enemySpawns = [
+      { id: 'ENEMY_1', x: 3150, y: 650 },  // Top-Right
+      { id: 'ENEMY_2', x: 650, y: 650 },   // Top-Left
+      { id: 'ENEMY_3', x: 3150, y: 3150 }, // Bottom-Right
+      { id: 'ENEMY_4', x: 1900, y: 650 }   // Top-Center
     ];
-    for (const [tx, ty] of treeCoords) {
-      this.resources.push(new ResourceNode(tx, ty, 'WOOD', 180));
+
+    for (let i = 0; i < this.enemyCount; i++) {
+      const spawn = enemySpawns[i];
+      const faction = spawn.id;
+
+      // Enemy Fortress & Barracks
+      const eTC = new Building(spawn.x, spawn.y, 'TOWN_CENTER', faction, true);
+      const eBarracks = new Building(spawn.x - 100, spawn.y + 60, 'BARRACKS', faction, true);
+      this.buildings.push(eTC);
+      this.buildings.push(eBarracks);
+
+      // Enemy Starting Garrison
+      this.units.push(new Unit(spawn.x + 50, spawn.y + 70, 'SWORDSMAN', faction));
+      this.units.push(new Unit(spawn.x + 80, spawn.y + 85, 'SWORDSMAN', faction));
+      this.units.push(new Unit(spawn.x - 40, spawn.y + 90, 'ARCHER', faction));
+      this.units.push(new Unit(spawn.x + 20, spawn.y + 110, 'ARCHER', faction));
+
+      // Enemy territory resources
+      this.spawnForestGrove(spawn.x + 150, spawn.y - 60, 8, 200);
+      this.resources.push(new ResourceNode(spawn.x - 160, spawn.y - 60, 'GOLD', 600));
+      this.resources.push(new ResourceNode(spawn.x + 120, spawn.y + 140, 'FOOD', 300));
     }
 
-    // Gold Mines
-    this.resources.push(new ResourceNode(720, 420, 'GOLD', 550));
-    this.resources.push(new ResourceNode(770, 450, 'GOLD', 450));
+    // ==========================================
+    // 3. EXPANSIVE CENTRAL RESOURCES (Wild forests & gold seams)
+    // ==========================================
+    const neutralGroves = [
+      [1400, 1500], [1800, 1400], [2200, 1600],
+      [1300, 2300], [1900, 2400], [2500, 2200],
+      [1900, 1900], [900, 1900], [2900, 1900]
+    ];
+    for (const [gx, gy] of neutralGroves) {
+      this.spawnForestGrove(gx, gy, 8, 220);
+    }
 
-    // Berry Bushes
-    this.resources.push(new ResourceNode(660, 600, 'FOOD', 260));
-    this.resources.push(new ResourceNode(700, 630, 'FOOD', 260));
+    // High yield gold outcrops
+    const neutralGold = [
+      [1600, 1600], [2200, 1400], [1600, 2200],
+      [2200, 2300], [1900, 1750], [1900, 2050]
+    ];
+    for (const [mx, my] of neutralGold) {
+      this.resources.push(new ResourceNode(mx, my, 'GOLD', 650));
+    }
 
-    // Neutral Shallows Grove
-    this.resources.push(new ResourceNode(1050, 950, 'WOOD', 200));
-    this.resources.push(new ResourceNode(1100, 920, 'WOOD', 200));
-    this.resources.push(new ResourceNode(1150, 960, 'GOLD', 400));
+    // Forage berry groves
+    const neutralBerries = [
+      [1700, 1850], [2100, 1950], [1400, 1900], [2400, 1900]
+    ];
+    for (const [bx, by] of neutralBerries) {
+      this.resources.push(new ResourceNode(bx, by, 'FOOD', 300));
+    }
+  }
 
-    // Enemy Territory Resources
-    this.resources.push(new ResourceNode(1950, 1750, 'WOOD', 220));
-    this.resources.push(new ResourceNode(1980, 1800, 'WOOD', 220));
-    this.resources.push(new ResourceNode(1680, 1920, 'GOLD', 550));
+  spawnForestGrove(centerX, centerY, count = 8, woodPerTree = 200) {
+    for (let i = 0; i < count; i++) {
+      const ox = (Math.random() - 0.5) * 120;
+      const oy = (Math.random() - 0.5) * 120;
+      const tx = Math.max(100, Math.min(this.map.width - 100, centerX + ox));
+      const ty = Math.max(100, Math.min(this.map.height - 100, centerY + oy));
+      if (this.map.isWalkable(tx, ty)) {
+        this.resources.push(new ResourceNode(tx, ty, 'WOOD', woodPerTree));
+      }
+    }
   }
 
   startPlacement(buildingType) {
     const config = BUILDING_TYPES[buildingType];
     if (!config) return;
 
-    if (config.cost.wood && this.player.wood < config.cost.wood) {
-      this.hud.addFloatingText(this.camera.x, this.camera.y, `Need ${config.cost.wood} Wood!`, '#ef4444');
+    let woodCost = config.cost.wood || 0;
+    let goldCost = config.cost.gold || 0;
+    if (this.playerCiv === 'CHINESE' && woodCost > 0) {
+      woodCost = Math.round(woodCost * 0.8); // 20% cheaper wood
+    }
+
+    if (woodCost && this.player.wood < woodCost) {
+      this.hud.addFloatingText(this.camera.x, this.camera.y, `Need ${woodCost} Wood!`, '#ef4444');
       return;
     }
-    if (config.cost.gold && this.player.gold < config.cost.gold) {
-      this.hud.addFloatingText(this.camera.x, this.camera.y, `Need ${config.cost.gold} Gold!`, '#ef4444');
+    if (goldCost && this.player.gold < goldCost) {
+      this.hud.addFloatingText(this.camera.x, this.camera.y, `Need ${goldCost} Gold!`, '#ef4444');
       return;
     }
 
@@ -183,8 +297,13 @@ export class Game {
     }
 
     const config = BUILDING_TYPES[this.placementMode.buildingType];
-    if (config.cost.wood && this.player.wood < config.cost.wood) return false;
-    if (config.cost.gold && this.player.gold < config.cost.gold) return false;
+    let woodCost = config.cost.wood || 0;
+    let goldCost = config.cost.gold || 0;
+    if (this.playerCiv === 'CHINESE' && woodCost > 0) {
+      woodCost = Math.round(woodCost * 0.8);
+    }
+    if (woodCost && this.player.wood < woodCost) return false;
+    if (goldCost && this.player.gold < goldCost) return false;
 
     return true;
   }
@@ -198,6 +317,15 @@ export class Game {
       this.player.maxPop += building.config.popProvided || 5;
       this.hud.addFloatingText(building.x, building.y - 48, `+5 Max Pop! 👥`, '#22c55e');
     }
+
+    // Apply active upgrades to newly completed building (e.g. towers get Arrow Slits)
+    if (building.faction === 'PLAYER') {
+      building.applyUpgrades(this.playerUpgrades);
+      if (this.playerCiv === 'KOREAN' && (building.isFortress || building.buildingType === 'WATCH_TOWER')) {
+        building.volleyArrows += 2;
+        building.attackRange = Math.round(building.attackRange * 1.25);
+      }
+    }
   }
 
   onUpgradeCompleted(upgradeId, faction) {
@@ -207,10 +335,17 @@ export class Game {
       this.hud.showAlert(`✨ UPGRADE COMPLETE: ${info.name}! ${info.desc}`);
       if (this.sound) this.sound.playUpgradeComplete();
 
-      // Refresh stats for all existing player units
+      // Refresh units
       for (const unit of this.units) {
         if (unit.faction === 'PLAYER') {
           unit.applyUpgrades(this.playerUpgrades);
+        }
+      }
+
+      // Refresh buildings (Arrow Slits, Ballistics)
+      for (const b of this.buildings) {
+        if (b.faction === 'PLAYER') {
+          b.applyUpgrades(this.playerUpgrades);
         }
       }
     }
@@ -222,13 +357,12 @@ export class Game {
 
     const unit = new Unit(building.x, building.y + building.radius + 8, unitType, building.faction);
 
-    // Apply active player upgrades immediately
     if (building.faction === 'PLAYER') {
+      unit.applyCivBonuses(this.playerCiv);
       unit.applyUpgrades(this.playerUpgrades);
       this.stats.trained++;
       this.hud.addFloatingText(building.x, building.y - 36, `+1 ${unit.name} ⚔️`, '#38bdf8');
 
-      // March to rally point if outside building
       if (building.hasCustomRallyPoint) {
         unit.moveTo(rx, ry);
       }
@@ -278,15 +412,21 @@ export class Game {
   }
 
   depositResource(type, amount, dropoffX, dropoffY) {
+    let bonus = 0;
+    if (this.playerCiv === 'INDIAN' && (type === 'GOLD' || type === 'FOOD')) {
+      bonus = 2; // Extra resource yield
+    }
+    const total = amount + bonus;
+
     if (type === 'WOOD') {
-      this.player.wood += amount;
-      this.hud.addFloatingText(dropoffX, dropoffY - 30, `+${amount} Wood 🪵`, '#81c784');
+      this.player.wood += total;
+      this.hud.addFloatingText(dropoffX, dropoffY - 30, `+${total} Wood 🪵`, '#81c784');
     } else if (type === 'GOLD') {
-      this.player.gold += amount;
-      this.hud.addFloatingText(dropoffX, dropoffY - 30, `+${amount} Gold 🪙`, '#ffd54f');
+      this.player.gold += total;
+      this.hud.addFloatingText(dropoffX, dropoffY - 30, `+${total} Gold 🪙`, '#ffd54f');
     } else if (type === 'FOOD') {
-      this.player.food += amount;
-      this.hud.addFloatingText(dropoffX, dropoffY - 30, `+${amount} Food 🌾`, '#facc15');
+      this.player.food += total;
+      this.hud.addFloatingText(dropoffX, dropoffY - 30, `+${total} Food 🌾`, '#facc15');
     }
   }
 
@@ -318,15 +458,20 @@ export class Game {
   }
 
   setupInputHandlers() {
-    // 1. Single Click Selection & Placement Confirmation
     this.input.onSingleSelect = (worldX, worldY) => {
       if (this.placementMode.active) {
         if (this.placementMode.isValid) {
           const type = this.placementMode.buildingType;
           const config = BUILDING_TYPES[type];
 
-          if (config.cost.wood) this.player.wood -= config.cost.wood;
-          if (config.cost.gold) this.player.gold -= config.cost.gold;
+          let woodCost = config.cost.wood || 0;
+          let goldCost = config.cost.gold || 0;
+          if (this.playerCiv === 'CHINESE' && woodCost > 0) {
+            woodCost = Math.round(woodCost * 0.8);
+          }
+
+          if (woodCost) this.player.wood -= woodCost;
+          if (goldCost) this.player.gold -= goldCost;
 
           const newBuilding = new Building(
             this.placementMode.snappedX,
@@ -341,7 +486,6 @@ export class Game {
           this.hud.addPing(newBuilding.x, newBuilding.y, '#f59e0b');
           if (this.effects) this.effects.addWoodChips(newBuilding.x, newBuilding.y);
 
-          // Assign selected or nearest villager to construct
           const selectedVillagers = this.selectedEntities.filter(
             e => e instanceof Unit && e.unitType === 'VILLAGER' && e.faction === 'PLAYER'
           );
@@ -382,8 +526,7 @@ export class Game {
       // Check Units
       for (const unit of this.units) {
         if (unit.isDead || unit.isDying) continue;
-        // Hostile units under fog of war cannot be clicked
-        if (unit.faction === 'ENEMY' && this.fog && !this.fog.isVisible(unit.x, unit.y)) {
+        if (unit.faction !== 'PLAYER' && this.fog && !this.fog.isVisible(unit.x, unit.y)) {
           continue;
         }
         if (Math.hypot(unit.x - worldX, unit.y - worldY) <= unit.radius + 8) {
@@ -397,7 +540,7 @@ export class Game {
       // Check Buildings
       for (const b of this.buildings) {
         if (b.isDead) continue;
-        if (b.faction === 'ENEMY' && this.fog && !this.fog.isExplored(b.x, b.y)) {
+        if (b.faction !== 'PLAYER' && this.fog && !this.fog.isExplored(b.x, b.y)) {
           continue;
         }
         if (Math.hypot(b.x - worldX, b.y - worldY) <= b.radius + 12) {
@@ -421,7 +564,7 @@ export class Game {
       }
     };
 
-    // 2. Drag Box Selection
+    // Box Drag Select
     this.input.onBoxSelect = (minX, minY, maxX, maxY) => {
       if (this.placementMode.active) return;
 
@@ -445,7 +588,7 @@ export class Game {
       }
     };
 
-    // 3. Right-Click Context Orders & Rally Points
+    // Right-Click Context Orders
     this.input.onRightClick = (worldX, worldY) => {
       if (this.placementMode.active) {
         this.cancelPlacement();
@@ -467,9 +610,9 @@ export class Game {
       );
       if (selectedUnits.length === 0) return;
 
-      // Check Attack Hostile Unit
+      // Attack Hostile Unit
       for (const u of this.units) {
-        if (u.faction === 'ENEMY' && !u.isDead && !u.isDying) {
+        if (u.faction !== 'PLAYER' && !u.isDead && !u.isDying) {
           if (this.fog && !this.fog.isVisible(u.x, u.y)) continue;
           if (Math.hypot(u.x - worldX, u.y - worldY) <= u.radius + 12) {
             for (const warrior of selectedUnits) {
@@ -482,9 +625,9 @@ export class Game {
         }
       }
 
-      // Check Attack Hostile Building
+      // Attack Hostile Building
       for (const b of this.buildings) {
-        if (b.faction === 'ENEMY' && !b.isDead) {
+        if (b.faction !== 'PLAYER' && !b.isDead) {
           if (this.fog && !this.fog.isExplored(b.x, b.y)) continue;
           if (Math.hypot(b.x - worldX, b.y - worldY) <= b.radius + 16) {
             for (const warrior of selectedUnits) {
@@ -497,7 +640,7 @@ export class Game {
         }
       }
 
-      // Check Build Structure under construction
+      // Build Structure
       for (const b of this.buildings) {
         if (!b.isDead && !b.isConstructed && Math.hypot(b.x - worldX, b.y - worldY) <= b.radius + 24) {
           for (const u of selectedUnits) {
@@ -510,7 +653,7 @@ export class Game {
         }
       }
 
-      // Check Farm Harvesting
+      // Harvest Farm
       for (const b of this.buildings) {
         if (b.buildingType === 'FARM' && b.isConstructed && !b.isDead && Math.hypot(b.x - worldX, b.y - worldY) <= b.radius + 16) {
           const dropoff = this.findNearestDropoff(b.x, b.y, 'PLAYER');
@@ -525,7 +668,7 @@ export class Game {
         }
       }
 
-      // Check Resource Gathering
+      // Gather Natural Resource
       let clickedResource = null;
       for (const res of this.resources) {
         if (!res.isDead && Math.hypot(res.x - worldX, res.y - worldY) <= res.radius + 14) {
@@ -553,7 +696,7 @@ export class Game {
         }
       }
 
-      // Default Ground Move with Formations
+      // Default Ground Move with Formations & Intelligent Bridge Pathing
       this.hud.addPing(worldX, worldY, '#2ecc71');
       const count = selectedUnits.length;
       const cols = Math.ceil(Math.sqrt(count));
@@ -579,29 +722,22 @@ export class Game {
       });
     };
 
-    // 4. Control Groups (Ctrl+1-9, 1-9)
+    // Control Groups
     this.input.onControlGroup = (digit, isAssign, isDoubleTap) => {
       if (isAssign) {
-        // Save selection to group
         const group = this.selectedEntities.filter(e => e instanceof Unit && !e.isDead && !e.isDying);
         this.input.controlGroups[digit] = group;
-        this.hud.addFloatingText(this.camera.x, this.camera.y - 30, `Assigned Control Group ${digit} (${group.length} troops)`, '#38bdf8');
+        this.hud.addFloatingText(this.camera.x, this.camera.y - 30, `Assigned Group ${digit} (${group.length} troops)`, '#38bdf8');
       } else {
-        // Recall group
         const group = (this.input.controlGroups[digit] || []).filter(e => !e.isDead && !e.isDying);
         this.input.controlGroups[digit] = group;
 
         if (group.length > 0) {
-          for (const ent of this.selectedEntities) {
-            ent.isSelected = false;
-          }
+          for (const ent of this.selectedEntities) ent.isSelected = false;
           this.selectedEntities = [...group];
-          for (const ent of this.selectedEntities) {
-            ent.isSelected = true;
-          }
+          for (const ent of this.selectedEntities) ent.isSelected = true;
 
           if (isDoubleTap) {
-            // Center camera on group center
             let avgX = 0, avgY = 0;
             for (const u of group) {
               avgX += u.x;
@@ -617,7 +753,7 @@ export class Game {
       }
     };
 
-    // 5. Town Center Hotkey (H)
+    // Town Center Hotkey (H)
     this.input.onSelectTownCenter = () => {
       const tc = this.buildings.find(b => b.faction === 'PLAYER' && b.buildingType === 'TOWN_CENTER' && !b.isDead);
       if (tc) {
@@ -632,12 +768,12 @@ export class Game {
       }
     };
 
-    // 6. Idle Villager Hotkey (.)
+    // Idle Villager Hotkey (.)
     this.input.onCycleIdleVillager = () => {
       this.cycleIdleVillager();
     };
 
-    // 7. Jump to Alert (Spacebar)
+    // Spacebar Jump to Alert
     this.input.onJumpToAlert = () => {
       this.camera.x = this.lastAlertPos.x;
       this.camera.y = this.lastAlertPos.y;
@@ -645,7 +781,7 @@ export class Game {
       this.hud.addPing(this.lastAlertPos.x, this.lastAlertPos.y, '#ef4444');
     };
 
-    // 8. Escape Toggle Pause
+    // Escape Toggle Pause
     this.input.onTogglePause = () => {
       if (this.placementMode.active) {
         this.cancelPlacement();
@@ -668,12 +804,10 @@ export class Game {
     if (!this.hud.isPaused) {
       this.elapsedSeconds += dt;
       this.stats.time = this.elapsedSeconds;
-
       this.update(dt);
     }
 
     this.render();
-
     requestAnimationFrame((t) => this.loop(t));
   }
 
@@ -682,7 +816,7 @@ export class Game {
     this.map.update(dt);
     this.effects.update(dt);
 
-    // Update Placement Mode preview
+    // Placement Mode Preview
     if (this.placementMode.active) {
       const snapGrid = this.map.tileSize;
       this.placementMode.snappedX = Math.round(this.input.mouse.worldX / snapGrid) * snapGrid;
@@ -698,8 +832,19 @@ export class Game {
       }
     }
 
-    // Update Enemy AI
+    // Update AI
     this.enemyAI.update(dt);
+
+    // Resource Slow Regrowth
+    this.resourceRegrowthTimer += dt;
+    if (this.resourceRegrowthTimer >= 20.0) {
+      this.resourceRegrowthTimer = 0;
+      for (const res of this.resources) {
+        if (!res.isDead && res.resourceType === 'WOOD' && res.amount < res.maxAmount) {
+          res.amount = Math.min(res.maxAmount, res.amount + 2);
+        }
+      }
+    }
 
     // Update Resources
     for (let i = this.resources.length - 1; i >= 0; i--) {
@@ -732,14 +877,14 @@ export class Game {
       }
 
       if (unit.isDead) {
-        if (unit.faction === 'ENEMY') {
+        if (unit.faction !== 'PLAYER') {
           this.stats.vanquished++;
         }
         this.units.splice(i, 1);
       }
     }
 
-    // Adjust Ambient Music based on Combat tension
+    // Dynamic Soundscape
     if (this.sound) {
       this.sound.setCombatState(inCombatCount > 0);
     }
@@ -763,10 +908,14 @@ export class Game {
 
     // Check Victory & Defeat Conditions
     if (!this.isGameOver) {
-      const enemyTC = this.buildings.find(b => b.faction === 'ENEMY' && b.buildingType === 'TOWN_CENTER' && !b.isDead);
-      const playerTC = this.buildings.find(b => b.faction === 'PLAYER' && b.buildingType === 'TOWN_CENTER' && !b.isDead);
+      const enemyTCs = this.buildings.filter(
+        b => b.faction !== 'PLAYER' && b.buildingType === 'TOWN_CENTER' && !b.isDead
+      );
+      const playerTC = this.buildings.find(
+        b => b.faction === 'PLAYER' && b.buildingType === 'TOWN_CENTER' && !b.isDead
+      );
 
-      if (!enemyTC) {
+      if (enemyTCs.length === 0) {
         this.isGameOver = true;
         if (this.sound) this.sound.playVictory();
         this.hud.showGameOver(true, this.stats);
@@ -791,48 +940,33 @@ export class Game {
     this.ctx.scale(this.camera.zoom, this.camera.zoom);
     this.ctx.translate(-this.camera.x, -this.camera.y);
 
-    // Render TileMap terrain
     this.map.render(this.ctx, this.camera);
 
-    // Render sorted entities (Gaia, Friendly, and Visible Enemies)
     const renderList = [...this.resources, ...this.buildings, ...this.units].sort((a, b) => a.y - b.y);
     for (const ent of renderList) {
-      // Gaia resources: render if explored
       if (ent.faction === 'GAIA') {
         if (this.fog && !this.fog.isExplored(ent.x, ent.y)) continue;
         ent.render(this.ctx);
-      }
-      // Enemy entities: hide if unrevealed
-      else if (ent.faction === 'ENEMY') {
+      } else if (ent.faction !== 'PLAYER') {
         if (ent instanceof Unit) {
-          // Enemy units only visible if within active sight radius
           if (this.fog && !this.fog.isVisible(ent.x, ent.y)) continue;
           ent.render(this.ctx);
         } else if (ent instanceof Building) {
-          // Enemy buildings visible if explored
           if (this.fog && !this.fog.isExplored(ent.x, ent.y)) continue;
           ent.render(this.ctx);
         }
-      }
-      // Friendly player entities: always render
-      else {
+      } else {
         ent.render(this.ctx);
       }
     }
 
-    // Render Projectiles
     for (const p of this.projectiles) {
       if (this.fog && !this.fog.isVisible(p.x, p.y)) continue;
       p.render(this.ctx);
     }
 
-    // Render Particle Effects (Ripples, Dust, Sparks, Fireworks)
     this.effects.render(this.ctx);
-
-    // Render Fog of War world shroud
     this.fog.renderWorld(this.ctx);
-
-    // Render World Overlays (Pings, Blueprint Preview, Floating Combat Text)
     this.hud.renderWorldOverlays(this.ctx);
 
     this.ctx.restore();
